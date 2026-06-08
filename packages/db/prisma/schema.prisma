@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgMemberRole {
+  OWNER
+  ADMIN
+  VIEWER
+}
+
+enum OrgPlan {
+  FREE
+  PRO
+}
+
+enum IntegrationSource {
+  vetan
+  school_erp
+  manual
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  NOTICE
+  INACTIVE
+}
+
+enum BatchStatus {
+  DRAFT
+  READY
+  EXPORTED
+  FAILED
+}
+
+model PortalUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships OrganizationMember[]
+  batches     PrintBatch[]
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  logoUrl   String?
+  plan      OrgPlan  @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      OrganizationMember[]
+  integrations Integration[]
+  employees    EmployeeSnapshot[]
+  batches      PrintBatch[]
+}
+
+model OrganizationMember {
+  id             String        @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrgMemberRole @default(ADMIN)
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         PortalUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Integration {
+  id             String            @id @default(uuid())
+  organizationId String
+  source         IntegrationSource
+  externalOrgId  String?
+  apiBaseUrl     String?
+  apiKeyEnc      String?
+  lastSyncAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, source])
+}
+
+model EmployeeSnapshot {
+  id             String         @id @default(uuid())
+  organizationId String
+  externalId     String
+  employeeCode   String
+  firstName      String
+  lastName       String
+  email          String?
+  department     String?
+  designation    String?
+  status         EmployeeStatus @default(ACTIVE)
+  dateOfJoining  String?
+  photoUrl       String?
+  photoOverride  String?
+  syncedAt       DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  batchItems   PrintBatchEmployee[]
+
+  @@unique([organizationId, externalId])
+  @@index([organizationId, status])
+}
+
+model PrintBatch {
+  id             String      @id @default(uuid())
+  organizationId String
+  createdById    String
+  name           String
+  templatePreset String
+  status         BatchStatus @default(DRAFT)
+  employeeCount  Int         @default(0)
+  exportedAt     DateTime?
+  exportUrl      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    PortalUser           @relation(fields: [createdById], references: [id])
+  employees    PrintBatchEmployee[]
+}
+
+model PrintBatchEmployee {
+  id         String @id @default(uuid())
+  batchId    String
+  employeeId String
+
+  batch    PrintBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  employee EmployeeSnapshot @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, employeeId])
+}
