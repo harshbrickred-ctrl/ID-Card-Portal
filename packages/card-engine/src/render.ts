@@ -1,115 +1,142 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
-import type { CardTemplatePreset } from "@idportal/contracts";
 import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
-import type { CardEmployee, CardOrg } from "./types";
+import type { RenderStudentCardInput } from "./types";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function palette(preset: CardTemplatePreset) {
-  switch (preset) {
-    case "minimal":
-      return { bg: "#ffffff", primary: "#1e293b", accent: "#64748b", band: "#f1f5f9" };
-    case "photo-left":
-      return { bg: "#f8fafc", primary: "#0f172a", accent: "#31879b", band: "#e2e8f0" };
-    case "corporate":
-    default:
-      return { bg: "#ffffff", primary: "#111827", accent: "#d83e65", band: "#fdf2f8" };
-  }
-}
-
-async function photoCircle(buf: Buffer | null | undefined, size: number): Promise<Buffer | null> {
+async function photoRect(buf: Buffer | null | undefined, w: number, h: number): Promise<Buffer | null> {
   if (!buf) return null;
-  const rounded = await sharp(buf)
-    .resize(size, size, { fit: "cover" })
-    .png()
-    .toBuffer();
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`,
-  );
-  return sharp(rounded).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+  return sharp(buf).resize(w, h, { fit: "cover" }).png().toBuffer();
 }
 
-async function logoBox(buf: Buffer | null | undefined, w: number, h: number): Promise<Buffer | null> {
-  if (!buf) return null;
-  return sharp(buf).resize(w, h, { fit: "inside" }).png().toBuffer();
-}
-
-export async function renderCardFront(
-  employee: CardEmployee,
-  org: CardOrg,
-  preset: CardTemplatePreset,
-): Promise<Buffer> {
-  const colors = palette(preset);
-  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-  const photoSize = preset === "photo-left" ? 220 : 180;
-  const photo = await photoCircle(employee.photoBuffer, photoSize);
-  const logo = await logoBox(org.logoBuffer, 120, 48);
-
-  const photoX = preset === "photo-left" ? 48 : CARD_WIDTH / 2 - photoSize / 2;
-  const photoY = preset === "photo-left" ? 120 : 72;
-  const textX = preset === "photo-left" ? 300 : CARD_WIDTH / 2;
-
+async function defaultTemplate(accent: string, schoolName: string): Promise<Buffer> {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${CARD_WIDTH}" height="${CARD_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="${colors.bg}"/>
-  <rect x="0" y="0" width="100%" height="88" fill="${colors.band}"/>
-  <text x="48" y="58" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="${colors.primary}">${esc(org.name)}</text>
-  <text x="${textX}" y="${preset === "photo-left" ? 180 : 320}" text-anchor="${preset === "photo-left" ? "start" : "middle"}" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="${colors.primary}">${esc(fullName)}</text>
-  <text x="${textX}" y="${preset === "photo-left" ? 230 : 370}" text-anchor="${preset === "photo-left" ? "start" : "middle"}" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="${colors.accent}">${esc(employee.employeeCode)}</text>
-  ${employee.department ? `<text x="${textX}" y="${preset === "photo-left" ? 275 : 415}" text-anchor="${preset === "photo-left" ? "start" : "middle"}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="${colors.primary}">${esc(employee.department)}</text>` : ""}
-  ${employee.designation ? `<text x="${textX}" y="${preset === "photo-left" ? 315 : 450}" text-anchor="${preset === "photo-left" ? "start" : "middle"}" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#64748b">${esc(employee.designation)}</text>` : ""}
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect x="0" y="0" width="100%" height="110" fill="${accent}" opacity="0.15"/>
+  <rect x="0" y="0" width="100%" height="6" fill="${accent}"/>
+  <text x="48" y="72" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#0f172a">${esc(schoolName)}</text>
+  <text x="48" y="104" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b">STUDENT IDENTITY CARD</text>
+  <rect x="40" y="140" width="220" height="270" rx="12" fill="#f1f5f9" stroke="${accent}" stroke-width="2"/>
+  <text x="48" y="${CARD_HEIGHT - 40}" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#94a3b8">Valid for current academic year</text>
 </svg>`;
-
-  const composites: sharp.OverlayOptions[] = [];
-  if (logo) {
-    composites.push({ input: logo, top: 20, left: CARD_WIDTH - 168 });
-  }
-  if (photo) {
-    composites.push({ input: photo, top: photoY, left: photoX });
-  }
-
-  return sharp(Buffer.from(svg)).composite(composites).png().toBuffer();
+  return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-export async function renderCardBack(
-  employee: CardEmployee,
-  org: CardOrg,
-  preset: CardTemplatePreset,
+export function validateStudentCard(student: RenderStudentCardInput["student"]): string[] {
+  const errors: string[] = [];
+  if (!student.name?.trim()) errors.push("Name is required");
+  if (!student.enrollId?.trim()) errors.push("Enrollment ID is required");
+  if (!student.class?.trim()) errors.push("Class is required");
+  if (!student.section?.trim()) errors.push("Section is required");
+  if (!student.fatherName?.trim()) errors.push("Father's name is recommended");
+  if (!student.dob?.trim()) errors.push("Date of birth is recommended");
+  return errors;
+}
+
+export async function renderStudentCard(input: RenderStudentCardInput): Promise<Buffer> {
+  const { student, school, templateBuffer } = input;
+  const accent = school.accentColor || "#6366f1";
+
+  const base =
+    templateBuffer && templateBuffer.length > 0
+      ? await sharp(templateBuffer).resize(CARD_WIDTH, CARD_HEIGHT, { fit: "cover" }).png().toBuffer()
+      : await defaultTemplate(accent, school.name);
+
+  const photo = await photoRect(student.photoBuffer, 200, 250);
+  const textX = 280;
+  const lines = [
+    { label: "Name", value: student.name, y: 180, size: 36, bold: true },
+    { label: "Enroll ID", value: student.enrollId, y: 240, size: 24, bold: false },
+    { label: "Class / Section", value: `Class ${student.class} - ${student.section}`, y: 290, size: 22, bold: false },
+    { label: "Father", value: student.fatherName ?? "—", y: 340, size: 20, bold: false },
+    { label: "DOB", value: student.dob ?? "—", y: 385, size: 20, bold: false },
+    { label: "Blood Group", value: student.bloodGroup ?? "—", y: 430, size: 20, bold: false },
+  ];
+
+  const textSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${CARD_WIDTH}" height="${CARD_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+  ${lines
+    .map(
+      (l) => `
+  <text x="${textX}" y="${l.y}" font-family="Arial, Helvetica, sans-serif" font-size="${l.size}" font-weight="${l.bold ? "700" : "400"}" fill="#0f172a">${esc(l.value)}</text>`,
+    )
+    .join("")}
+  <rect x="36" y="136" width="228" height="278" rx="12" fill="none" stroke="${accent}" stroke-width="2"/>
+</svg>`;
+
+  const composites: sharp.OverlayOptions[] = [{ input: Buffer.from(textSvg), top: 0, left: 0 }];
+  if (photo) {
+    composites.push({ input: photo, top: 150, left: 50 });
+  }
+
+  return sharp(base).composite(composites).png().toBuffer();
+}
+
+export async function renderStudentCardBack(
+  student: RenderStudentCardInput["student"],
+  school: RenderStudentCardInput["school"],
 ): Promise<Buffer> {
-  const colors = palette(preset);
-  const qrPng = await QRCode.toBuffer(employee.employeeCode, {
+  const accent = school.accentColor || "#6366f1";
+  const qrPng = await QRCode.toBuffer(student.enrollId, {
     type: "png",
-    width: 200,
+    width: 180,
     margin: 1,
-    color: { dark: colors.primary, light: colors.bg },
+    color: { dark: "#0f172a", light: "#ffffff" },
   });
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${CARD_WIDTH}" height="${CARD_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="${colors.bg}"/>
-  <text x="48" y="80" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="${colors.primary}">${esc(org.name)}</text>
-  <text x="48" y="130" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#64748b">Employee ID: ${esc(employee.employeeCode)}</text>
-  ${employee.dateOfJoining ? `<text x="48" y="170" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b">Joined: ${esc(employee.dateOfJoining)}</text>` : ""}
-  <text x="48" y="${CARD_HEIGHT - 48}" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#94a3b8">Property of ${esc(org.name)}. If found, please return.</text>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <rect x="0" y="0" width="100%" height="6" fill="${accent}"/>
+  <text x="48" y="80" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">${esc(school.name)}</text>
+  <text x="48" y="130" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#64748b">${esc(student.name)}</text>
+  <text x="48" y="170" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b">Enroll: ${esc(student.enrollId)}</text>
+  ${student.address ? `<text x="48" y="220" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#94a3b8">${esc(student.address)}</text>` : ""}
+  <text x="48" y="${CARD_HEIGHT - 48}" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#94a3b8">If found, please return to ${esc(school.name)}</text>
 </svg>`;
 
   return sharp(Buffer.from(svg))
-    .composite([{ input: qrPng, top: 200, left: CARD_WIDTH - 248 }])
+    .composite([{ input: qrPng, top: 240, left: CARD_WIDTH - 230 }])
     .png()
     .toBuffer();
 }
 
-export async function renderEmployeeCards(
-  employee: CardEmployee,
-  org: CardOrg,
-  preset: CardTemplatePreset,
-): Promise<{ front: Buffer; back: Buffer }> {
-  const [front, back] = await Promise.all([
-    renderCardFront(employee, org, preset),
-    renderCardBack(employee, org, preset),
-  ]);
-  return { front, back };
+export async function buildStudentPrintZip(
+  entries: { enrollId: string; name: string; front: Buffer; back: Buffer }[],
+): Promise<Buffer> {
+  const archiver = (await import("archiver")).default;
+  const { PassThrough } = await import("stream");
+  const chunks: Buffer[] = [];
+  const stream = new PassThrough();
+  stream.on("data", (c: Buffer) => chunks.push(c));
+
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.pipe(stream);
+
+  for (const e of entries) {
+    const safe = e.enrollId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    archive.append(e.front, { name: `${safe}_front.png` });
+    archive.append(e.back, { name: `${safe}_back.png` });
+  }
+
+  const manifest = ["enrollId,name", ...entries.map((e) => `${e.enrollId},"${e.name.replace(/"/g, '""')}"`)].join("\n");
+  archive.append(manifest, { name: "manifest.csv" });
+
+  await archive.finalize();
+  await new Promise<void>((resolve, reject) => {
+    stream.on("end", resolve);
+    stream.on("error", reject);
+  });
+
+  return Buffer.concat(chunks);
 }

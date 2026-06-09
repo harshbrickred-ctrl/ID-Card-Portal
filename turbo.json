@@ -5,7 +5,6 @@
     "NODE_ENV",
     "DATABASE_URL",
     "JWT_SECRET",
-    "JWT_SECRETS",
     "PORTAL_URL",
     "BLOB_READ_WRITE_TOKEN"
   ],

@@ -1,34 +1,26 @@
 import { create } from "zustand";
+import type { AuthUser } from "@idportal/contracts";
 import { clearToken, setToken } from "./api/client";
 
 type AuthState = {
   token: string | null;
-  user: { id: string; email: string; name: string } | null;
-  organization: { id: string; name: string; plan: string } | null;
-  setSession: (data: {
-    token: string;
-    user: { id: string; email: string; name: string };
-    organization: { id: string; name: string; plan: string };
-  }) => void;
+  user: AuthUser | null;
+  setSession: (data: { token: string; user: AuthUser }) => void;
   logout: () => void;
   hydrate: () => Promise<void>;
+  isSuperAdmin: () => boolean;
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   user: null,
-  organization: null,
   setSession: (data) => {
     setToken(data.token);
-    set({
-      token: data.token,
-      user: data.user,
-      organization: data.organization,
-    });
+    set({ token: data.token, user: data.user });
   },
   logout: () => {
     clearToken();
-    set({ token: null, user: null, organization: null });
+    set({ token: null, user: null });
   },
   hydrate: async () => {
     if (typeof window === "undefined") return;
@@ -40,15 +32,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (json.success && json.data) {
-        set({
-          user: json.data.user,
-          organization: json.data.organization,
-        });
+      if (json.success && json.data?.user) {
+        set({ user: json.data.user });
       }
     } catch {
       clearToken();
-      set({ token: null, user: null, organization: null });
+      set({ token: null, user: null });
     }
   },
+  isSuperAdmin: () => get().user?.role === "SUPER_ADMIN",
 }));

@@ -1,60 +1,114 @@
 import { hashSync } from "bcryptjs";
 import { prisma } from "../src/index";
 
-async function main() {
-  const email = "demo@idcards.local";
-  const existing = await prisma.portalUser.findUnique({ where: { email } });
+async function ensureUser(
+  email: string,
+  name: string,
+  password: string,
+  role: "SUPER_ADMIN" | "ADMIN",
+) {
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    console.log("Seed already applied");
+    await prisma.user.update({ where: { email }, data: { role, name } });
+    return existing;
+  }
+  return prisma.user.create({
+    data: { email, name, passwordHash: hashSync(password, 10), role },
+  });
+}
+
+async function main() {
+  const superAdmin = await ensureUser(
+    "superadmin@schoolcards.local",
+    "Super Admin",
+    "SuperAdmin@12345",
+    "SUPER_ADMIN",
+  );
+  const admin = await ensureUser(
+    "admin@schoolcards.local",
+    "School Admin",
+    "Admin@12345",
+    "ADMIN",
+  );
+
+  const schoolCount = await prisma.school.count();
+  if (schoolCount > 0) {
+    console.log("Users seeded:", superAdmin.email, admin.email, "(schools already exist)");
     return;
   }
 
-  const user = await prisma.portalUser.create({
+  const schoolA = await prisma.school.create({
     data: {
-      email,
-      name: "Demo Admin",
-      passwordHash: hashSync("Demo@12345", 10),
-    },
-  });
-
-  const org = await prisma.organization.create({
-    data: {
-      name: "Demo Company",
-      plan: "FREE",
-      members: {
-        create: { userId: user.id, role: "OWNER" },
-      },
-      integrations: {
-        create: { source: "manual" },
-      },
-      employees: {
+      name: "Green Valley Public School",
+      code: "GVPS",
+      address: "12 Park Avenue, Mumbai",
+      accentColor: "#B2ABB2",
+      students: {
         create: [
           {
-            externalId: "demo-1",
-            employeeCode: "EMP001",
-            firstName: "Raj",
-            lastName: "Sharma",
-            department: "Engineering",
-            designation: "Software Engineer",
-            status: "ACTIVE",
-            dateOfJoining: "2024-01-15",
+            enrollId: "GVPS-2024-001",
+            name: "Aarav Sharma",
+            class: "10",
+            section: "A",
+            fatherName: "Raj Sharma",
+            dob: "2010-05-12",
+            bloodGroup: "B+",
           },
           {
-            externalId: "demo-2",
-            employeeCode: "EMP002",
-            firstName: "Priya",
-            lastName: "Patel",
-            department: "HR",
-            designation: "HR Manager",
-            status: "ACTIVE",
-            dateOfJoining: "2023-06-01",
+            enrollId: "GVPS-2024-002",
+            name: "Priya Patel",
+            class: "10",
+            section: "A",
+            fatherName: "Amit Patel",
+            dob: "2010-08-22",
+            bloodGroup: "O+",
+          },
+          {
+            enrollId: "GVPS-2024-003",
+            name: "Rohan Mehta",
+            class: "9",
+            section: "B",
+            fatherName: "Suresh Mehta",
+            dob: "2011-02-14",
+            bloodGroup: "A+",
           },
         ],
       },
     },
   });
 
-  console.log("Seeded demo org:", org.id, "user:", user.email);
+  const schoolB = await prisma.school.create({
+    data: {
+      name: "Sunrise International School",
+      code: "SIS",
+      address: "45 Lake Road, Pune",
+      accentColor: "#CCC3D0",
+      students: {
+        create: [
+          {
+            enrollId: "SIS-2024-101",
+            name: "Isha Gupta",
+            class: "8",
+            section: "C",
+            fatherName: "Vikram Gupta",
+            dob: "2012-11-03",
+            bloodGroup: "AB+",
+          },
+          {
+            enrollId: "SIS-2024-102",
+            name: "Arjun Singh",
+            class: "8",
+            section: "C",
+            fatherName: "Harpreet Singh",
+            dob: "2012-07-19",
+            bloodGroup: "B-",
+          },
+        ],
+      },
+    },
+  });
+
+  console.log("Seeded users + schools:", superAdmin.email, admin.email, schoolA.code, schoolB.code);
 }
 
 main()

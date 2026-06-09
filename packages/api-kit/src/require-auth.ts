@@ -6,7 +6,6 @@ export type PortalTokenPayload = {
   sub: string;
   email: string;
   name: string;
-  organizationId: string;
   role: string;
 };
 
@@ -48,16 +47,15 @@ export async function requireAuth(req: NextRequest): Promise<PortalTokenPayload>
       sub: String(payload.sub),
       email: String(payload.email),
       name: String(payload.name),
-      organizationId: String(payload.organizationId),
-      role: String(payload.role),
+      role: String(payload.role ?? "ADMIN"),
     };
   } catch {
     throw new UnauthorizedError("Invalid or expired token");
   }
 }
 
-export function requireRole(user: PortalTokenPayload, roles: string[]) {
-  if (!roles.includes(user.role)) {
-    throw new ForbiddenError("Insufficient role");
+export function requireSuperAdmin(user: PortalTokenPayload) {
+  if (user.role !== "SUPER_ADMIN") {
+    throw new ForbiddenError("Only Super Admin can delete records");
   }
 }

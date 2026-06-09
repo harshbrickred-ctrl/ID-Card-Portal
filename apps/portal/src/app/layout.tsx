@@ -3,8 +3,8 @@ import { PortalShell } from "@/components/portal-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ID Card Portal",
-  description: "Bulk CR-80 employee ID card printing",
+  title: "School ID Card Portal",
+  description: "Student ID card printing for schools",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
