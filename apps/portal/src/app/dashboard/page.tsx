@@ -36,7 +36,12 @@ export default function DashboardPage() {
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
   const [data, setData] = useState<DashboardData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", code: "", address: "", accentColor: palette.orchidHush });
+  const [form, setForm] = useState<{ name: string; code: string; address: string; accentColor: string }>({
+    name: "",
+    code: "",
+    address: "",
+    accentColor: palette.orchidHush,
+  });
   const [error, setError] = useState("");
 
   async function load() {

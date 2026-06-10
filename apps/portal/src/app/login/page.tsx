@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GraduationCap } from "lucide-react";
+import type { AuthUser } from "@idportal/contracts";
 import { apiFetch } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -19,10 +20,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const data = await apiFetch<{
-        token: string;
-        user: { id: string; email: string; name: string };
-      }>("/v1/auth/login", {
+      const data = await apiFetch<{ token: string; user: AuthUser }>("/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
