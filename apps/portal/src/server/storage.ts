@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
@@ -23,6 +23,14 @@ export async function readStorageFile(relPath: string): Promise<Buffer | null> {
     return await readFile(storagePath(relPath));
   } catch {
     return null;
+  }
+}
+
+export async function deleteStorageFile(relPath: string) {
+  try {
+    await unlink(storagePath(relPath));
+  } catch {
+    // ignore missing files
   }
 }
 

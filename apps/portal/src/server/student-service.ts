@@ -2,7 +2,7 @@ import { prisma } from "@idportal/db";
 import type { StudentDto, StudentUpdateDto } from "@idportal/contracts";
 import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import * as XLSX from "xlsx";
-import { publicFileUrl, readStorageFile, saveFile } from "./storage";
+import { deleteStorageFile, publicFileUrl, readStorageFile, saveFile } from "./storage";
 
 export type StudentFilters = {
   schoolId: string;
@@ -155,6 +155,9 @@ export async function saveStudentPhoto(studentId: string, buffer: Buffer, ext: s
   if (!student) throw new NotFoundError("Student not found");
 
   const relPath = `photos/${student.schoolId}/${student.enrollId}.${ext}`;
+  if (student.photoUrl && student.photoUrl !== relPath) {
+    await deleteStorageFile(student.photoUrl);
+  }
   await saveFile(relPath, buffer);
   await prisma.student.update({ where: { id: studentId }, data: { photoUrl: relPath } });
   return { photoUrl: publicFileUrl(relPath) };

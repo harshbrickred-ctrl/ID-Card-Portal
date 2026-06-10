@@ -9,7 +9,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
 
   const ext = relPath.split(".").pop()?.toLowerCase();
   const type =
-    ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "application/octet-stream";
+    ext === "png"
+      ? "image/png"
+      : ext === "webp"
+        ? "image/webp"
+        : ext === "jpg" || ext === "jpeg"
+          ? "image/jpeg"
+          : "application/octet-stream";
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: { "Content-Type": type, "Cache-Control": "private, max-age=3600" },

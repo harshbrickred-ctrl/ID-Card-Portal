@@ -40,6 +40,12 @@ export default function StudentsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyStudent);
   const [showAdd, setShowAdd] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [editPhotoUrl, setEditPhotoUrl] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoVersions, setPhotoVersions] = useState<Record<string, number>>({});
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [photoMessage, setPhotoMessage] = useState("");
 
   const loadStudents = useCallback(async () => {
     if (!schoolId) return;
@@ -63,6 +69,16 @@ export default function StudentsPage() {
     void loadStudents();
   }, [loadStudents]);
 
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
   const selectedSchool = schools.find((s) => s.id === schoolId);
 
   async function importExcel(e: React.FormEvent) {
@@ -85,20 +101,37 @@ export default function StudentsPage() {
     }
   }
 
+  function resetPhotoState() {
+    setPhotoFile(null);
+    setEditPhotoUrl(null);
+    setPhotoPreview(null);
+    setPhotoMessage("");
+  }
+
+  function closeModal() {
+    setShowAdd(false);
+    setEditId(null);
+    setForm(emptyStudent);
+    resetPhotoState();
+  }
+
   async function saveStudent(e: React.FormEvent) {
     e.preventDefault();
     try {
+      let studentId = editId;
       if (editId) {
         await apiFetch(`/v1/students/${editId}`, { method: "PATCH", body: JSON.stringify(form) });
       } else {
-        await apiFetch("/v1/students", {
+        const created = await apiFetch<Student>("/v1/students", {
           method: "POST",
           body: JSON.stringify({ ...form, schoolId }),
         });
+        studentId = created.id;
       }
-      setShowAdd(false);
-      setEditId(null);
-      setForm(emptyStudent);
+      if (photoFile && studentId) {
+        await uploadPhoto(studentId, photoFile, { silent: true });
+      }
+      closeModal();
       await loadStudents();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Save failed");
@@ -111,11 +144,29 @@ export default function StudentsPage() {
     await loadStudents();
   }
 
-  async function uploadPhoto(studentId: string, file: File) {
-    const fd = new FormData();
-    fd.append("photo", file);
-    await apiFetch(`/v1/students/${studentId}/photo`, { method: "POST", body: fd });
-    await loadStudents();
+  async function uploadPhoto(
+    studentId: string,
+    file: File,
+    options?: { input?: HTMLInputElement | null; silent?: boolean },
+  ) {
+    setUploadingPhotoId(studentId);
+    if (!options?.silent) setPhotoMessage("");
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      await apiFetch(`/v1/students/${studentId}/photo`, { method: "POST", body: fd });
+      setPhotoVersions((prev) => ({ ...prev, [studentId]: Date.now() }));
+      if (!options?.silent) setPhotoMessage("Photo uploaded successfully");
+      await loadStudents();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Photo upload failed";
+      if (options?.silent) throw err;
+      setPhotoMessage(message);
+      alert(message);
+    } finally {
+      setUploadingPhotoId(null);
+      if (options?.input) options.input.value = "";
+    }
   }
 
   function startEdit(s: Student) {
@@ -129,6 +180,9 @@ export default function StudentsPage() {
       phoneNumber: s.phoneNumber ?? "",
       address: s.address ?? "",
     });
+    setEditPhotoUrl(s.photoUrl);
+    setPhotoFile(null);
+    setPhotoMessage("");
     setShowAdd(true);
   }
 
@@ -143,6 +197,7 @@ export default function StudentsPage() {
             onClick={() => {
               setEditId(null);
               setForm(emptyStudent);
+              resetPhotoState();
               setShowAdd(true);
             }}
             className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
@@ -217,15 +272,33 @@ export default function StudentsPage() {
             {students.map((s) => (
               <tr key={s.id} className="border-b border-white/5">
                 <td className="py-3 pr-4">
-                  {s.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.photoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                  ) : (
+                  <div className="flex items-center gap-2">
+                    {s.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`${s.photoUrl}${photoVersions[s.id] ? `?v=${photoVersions[s.id]}` : ""}`}
+                        alt=""
+                        className="h-10 w-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-[10px] text-[var(--muted-foreground)]">
+                        No photo
+                      </div>
+                    )}
                     <label className="btn-ghost cursor-pointer rounded-lg px-2 py-1 text-xs">
-                      Upload
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadPhoto(s.id, e.target.files[0])} />
+                      {uploadingPhotoId === s.id ? "Uploading…" : s.photoUrl ? "Replace" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={uploadingPhotoId === s.id}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void uploadPhoto(s.id, file, { input: e.target });
+                        }}
+                      />
                     </label>
-                  )}
+                  </div>
                 </td>
                 <td className="py-3 pr-4 font-medium">{s.name}</td>
                 <td className="py-3 pr-4 font-mono text-xs">{s.enrollId}</td>
@@ -269,9 +342,36 @@ export default function StudentsPage() {
               <input className="input-glass" placeholder="DOB (e.g. 2010-05-12)" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
               <input className="input-glass" placeholder="Phone Number" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
               <input className="input-glass sm:col-span-2" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">Student photo</label>
+                <div className="flex items-center gap-3">
+                  {photoPreview || editPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={photoPreview ?? editPhotoUrl ?? ""}
+                      alt=""
+                      className="h-16 w-16 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-white/5 text-xs text-[var(--muted-foreground)]">
+                      No photo
+                    </div>
+                  )}
+                  <input
+                    className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  {editId ? "Choose a new image to replace the current photo when you save." : "Optional. You can also upload from the table after saving."}
+                </p>
+                {photoMessage ? <p className="mt-1 text-sm text-success">{photoMessage}</p> : null}
+              </div>
               <div className="flex gap-2 sm:col-span-2">
                 <button type="submit" className="btn-primary flex-1 rounded-xl py-2">Save</button>
-                <button type="button" onClick={() => setShowAdd(false)} className="btn-ghost flex-1 rounded-xl py-2">Cancel</button>
+                <button type="button" onClick={closeModal} className="btn-ghost flex-1 rounded-xl py-2">Cancel</button>
               </div>
             </form>
           </GlassCard>
