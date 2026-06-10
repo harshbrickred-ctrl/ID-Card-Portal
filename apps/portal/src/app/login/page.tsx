@@ -7,11 +7,13 @@ import type { AuthUser } from "@idportal/contracts";
 import { apiFetch } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth-store";
 
+const isDev = process.env.NODE_ENV === "development";
+
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState("admin@schoolcards.local");
-  const [password, setPassword] = useState("Admin@12345");
+  const [email, setEmail] = useState(isDev ? "admin@schoolcards.local" : "");
+  const [password, setPassword] = useState(isDev ? "Admin@12345" : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -60,6 +62,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@school.com"
               required
             />
           </div>
@@ -70,6 +73,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               required
             />
           </div>
@@ -81,12 +85,6 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
-
-        <div className="mt-6 rounded-xl border border-[var(--border)] bg-black/15 p-3 text-xs text-[var(--endless-slumber)]">
-          <p className="font-medium text-[var(--orchid-hush)]">Demo accounts</p>
-          <p className="mt-1">Admin: admin@schoolcards.local</p>
-          <p>Super Admin: superadmin@schoolcards.local</p>
-        </div>
       </div>
     </div>
   );

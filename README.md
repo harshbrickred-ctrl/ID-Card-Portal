@@ -26,10 +26,7 @@ npm run dev
 
 Open http://localhost:3001
 
-| Role | Email | Password | Permissions |
-|------|-------|----------|-------------|
-| Admin | `admin@schoolcards.local` | `Admin@12345` | Add, create, update |
-| Super Admin | `superadmin@schoolcards.local` | `SuperAdmin@12345` | Full access including delete |
+After `db:seed`, an **Admin** account is created for day-to-day use (add/update only). A separate **Super Admin** account is also seeded for delete operations — credentials are not shown in the app; check your seed output or database directly.
 
 ## Excel import columns
 

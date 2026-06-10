@@ -1,37 +1,34 @@
-# Deploy ID Card Portal
+# Deploy School ID Card Portal
 
 ## Vercel
 
-1. Create project from `harshbrickred-ctrl/id-card-portal` (or your repo).
-2. Root directory: `apps/portal`
-3. Install command: `cd ../.. && npm install`
-4. Build command: `cd ../.. && npm run db:generate && npm run build --workspace=@idportal/portal`
+1. Import [harshbrickred-ctrl/ID-Card-Portal](https://github.com/harshbrickred-ctrl/ID-Card-Portal)
+2. **Root Directory:** `apps/portal`
+3. Install / build commands are set in `apps/portal/vercel.json`
 
-### Environment variables
+### Required environment variables
 
-| Variable | Example |
-|----------|---------|
-| `DATABASE_URL` | Neon Postgres connection string |
-| `JWT_SECRET` | 32+ char random string |
-| `JWT_SECRETS` | `{"vetan":"<same as Vetan ID_CARD_PORTAL_JWT_SECRET>"}` |
-| `PORTAL_URL` | `https://cards.vetan.app` |
-| `NEXT_PUBLIC_PORTAL_URL` | `https://cards.vetan.app` |
+Add these in **Vercel → Project → Settings → Environment Variables** for **Production**, **Preview**, and **Development**:
 
-## Vetan (sangam)
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Neon Postgres **pooled** connection string (`?sslmode=require`) |
+| `JWT_SECRET` | Random string, at least 32 characters |
+| `PORTAL_URL` | Your deployed URL, e.g. `https://your-app.vercel.app` |
+| `NEXT_PUBLIC_PORTAL_URL` | Same as `PORTAL_URL` |
 
-Add to Vercel env for `apps/web`:
+**Important:** If `DATABASE_URL` is missing, sign-in will fail with a Prisma error. After adding or changing env vars, **redeploy** the project.
 
-| Variable | Example |
-|----------|---------|
-| `ID_CARD_PORTAL_URL` | `https://cards.vetan.app` |
-| `ID_CARD_PORTAL_JWT_SECRET` | shared secret |
+### Database setup (run once from your machine)
 
-Run `npm run db:seed` on Vetan to add `id-cards:*` permissions to ADMIN roles.
+```bash
+# packages/db/.env — set DATABASE_URL to your Neon connection string
+npm run db:migrate
+npm run db:seed
+```
 
-## Local E2E
+### Neon on Vercel
 
-1. Portal: `cd id-card-portal && npm install && cp .env.example .env` — set `JWT_SECRET` and `JWT_SECRETS`
-2. Vetan: set `ID_CARD_PORTAL_URL=http://localhost:3001` and matching `ID_CARD_PORTAL_JWT_SECRET`
-3. Start portal on 3001, Vetan on 3000
-4. Vetan → Settings → Integrations → Generate API key
-5. Sidebar → ID Cards (SSO) → Integrations → Sync → New batch → Export ZIP
+1. In Vercel, go to **Storage** or connect Neon from the Marketplace
+2. Link the database to your project — this can auto-set `DATABASE_URL`
+3. Or copy the **pooled** connection string from Neon dashboard and paste it manually

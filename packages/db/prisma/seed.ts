@@ -33,7 +33,7 @@ async function main() {
 
   const schoolCount = await prisma.school.count();
   if (schoolCount > 0) {
-    console.log("Users seeded:", superAdmin.email, admin.email, "(schools already exist)");
+    console.log("Users seeded (admin + super admin). Schools already exist.");
     return;
   }
 
@@ -108,7 +108,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded users + schools:", superAdmin.email, admin.email, schoolA.code, schoolB.code);
+  console.log("Seeded users + schools:", admin.email, schoolA.code, schoolB.code);
 }
 
 main()
