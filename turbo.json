@@ -6,7 +6,9 @@
     "DATABASE_URL",
     "JWT_SECRET",
     "PORTAL_URL",
-    "BLOB_READ_WRITE_TOKEN"
+    "BLOB_READ_WRITE_TOKEN",
+    "BLOB_STORE_ID",
+    "VERCEL_OIDC_TOKEN"
   ],
   "tasks": {
     "build": {

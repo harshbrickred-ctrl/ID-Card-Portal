@@ -4,7 +4,8 @@ import path from "path";
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 
 function useBlobStorage() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  // OIDC (BLOB_STORE_ID + VERCEL_OIDC_TOKEN) or legacy BLOB_READ_WRITE_TOKEN
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim());
 }
 
 function isRemoteUrl(stored: string) {
@@ -36,7 +37,6 @@ export async function saveFile(relPath: string, data: Buffer): Promise<string> {
     const blob = await put(normalized, data, {
       access: "public",
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
     return blob.url;
   }
@@ -65,7 +65,7 @@ export async function deleteStorageFile(stored: string) {
   try {
     if (isRemoteUrl(stored)) {
       const { del } = await import("@vercel/blob");
-      await del(stored, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      await del(stored);
       return;
     }
 
