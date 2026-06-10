@@ -32,13 +32,13 @@ After `db:seed`, an **Admin** account is created for day-to-day use (add/update 
 
 | Column | Required |
 |--------|----------|
-| Enroll ID | Yes |
 | Name | Yes |
+| Enroll ID | Yes |
 | Class | Yes |
 | Section | Yes |
-| Father Name | No |
 | DOB | No |
-| Blood Group | No |
+| Phone Number | No |
+| Address | No |
 
 ## Monorepo
 

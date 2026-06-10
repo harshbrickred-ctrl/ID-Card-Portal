@@ -13,9 +13,9 @@ type Student = {
   name: string;
   class: string;
   section: string;
-  fatherName: string | null;
   dob: string | null;
-  bloodGroup: string | null;
+  phoneNumber: string | null;
+  address: string | null;
   photoUrl: string | null;
 };
 
@@ -24,9 +24,9 @@ const emptyStudent = {
   name: "",
   class: "",
   section: "",
-  fatherName: "",
   dob: "",
-  bloodGroup: "",
+  phoneNumber: "",
+  address: "",
 };
 
 export default function StudentsPage() {
@@ -125,9 +125,9 @@ export default function StudentsPage() {
       name: s.name,
       class: s.class,
       section: s.section,
-      fatherName: s.fatherName ?? "",
       dob: s.dob ?? "",
-      bloodGroup: s.bloodGroup ?? "",
+      phoneNumber: s.phoneNumber ?? "",
+      address: s.address ?? "",
     });
     setShowAdd(true);
   }
@@ -185,7 +185,7 @@ export default function StudentsPage() {
         </form>
         {importMsg ? <p className="mt-2 text-sm text-success">{importMsg}</p> : null}
         <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-          Excel columns: Enroll ID, Name, Class, Section, Father Name, DOB, Blood Group
+          Excel columns: Name, Enroll ID, Class, Section, DOB, Phone Number, Address
         </p>
       </GlassCard>
 
@@ -199,15 +199,17 @@ export default function StudentsPage() {
       </GlassCard>
 
       <GlassCard className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-white/10 text-left text-[var(--muted-foreground)]">
               <th className="pb-3 pr-4">Photo</th>
-              <th className="pb-3 pr-4">Enroll ID</th>
               <th className="pb-3 pr-4">Name</th>
+              <th className="pb-3 pr-4">Enroll ID</th>
               <th className="pb-3 pr-4">Class</th>
               <th className="pb-3 pr-4">Section</th>
-              <th className="pb-3 pr-4">Father</th>
+              <th className="pb-3 pr-4">DOB</th>
+              <th className="pb-3 pr-4">Phone Number</th>
+              <th className="pb-3 pr-4">Address</th>
               <th className="pb-3">Actions</th>
             </tr>
           </thead>
@@ -225,11 +227,15 @@ export default function StudentsPage() {
                     </label>
                   )}
                 </td>
-                <td className="py-3 pr-4 font-mono text-xs">{s.enrollId}</td>
                 <td className="py-3 pr-4 font-medium">{s.name}</td>
+                <td className="py-3 pr-4 font-mono text-xs">{s.enrollId}</td>
                 <td className="py-3 pr-4">{s.class}</td>
                 <td className="py-3 pr-4">{s.section}</td>
-                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{s.fatherName ?? "—"}</td>
+                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{s.dob ?? "—"}</td>
+                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{s.phoneNumber ?? "—"}</td>
+                <td className="max-w-[200px] truncate py-3 pr-4 text-[var(--muted-foreground)]" title={s.address ?? undefined}>
+                  {s.address ?? "—"}
+                </td>
                 <td className="py-3">
                   <div className="flex gap-1">
                     <button type="button" onClick={() => startEdit(s)} className="btn-ghost rounded-lg p-2">
@@ -256,13 +262,13 @@ export default function StudentsPage() {
           <GlassCard elevated className="w-full max-w-lg">
             <h2 className="mb-4 text-lg font-semibold text-[var(--angora-goat)]">{editId ? "Edit Student" : "Add Student"}</h2>
             <form onSubmit={saveStudent} className="grid gap-3 sm:grid-cols-2">
-              <input className="input-glass" placeholder="Enroll ID" value={form.enrollId} onChange={(e) => setForm({ ...form, enrollId: e.target.value })} required />
               <input className="input-glass" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <input className="input-glass" placeholder="Enroll ID" value={form.enrollId} onChange={(e) => setForm({ ...form, enrollId: e.target.value })} required />
               <input className="input-glass" placeholder="Class" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })} required />
               <input className="input-glass" placeholder="Section" value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} required />
-              <input className="input-glass" placeholder="Father Name" value={form.fatherName} onChange={(e) => setForm({ ...form, fatherName: e.target.value })} />
-              <input className="input-glass" placeholder="DOB" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-              <input className="input-glass sm:col-span-2" placeholder="Blood Group" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+              <input className="input-glass" placeholder="DOB (e.g. 2010-05-12)" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+              <input className="input-glass" placeholder="Phone Number" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
+              <input className="input-glass sm:col-span-2" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               <div className="flex gap-2 sm:col-span-2">
                 <button type="submit" className="btn-primary flex-1 rounded-xl py-2">Save</button>
                 <button type="button" onClick={() => setShowAdd(false)} className="btn-ghost flex-1 rounded-xl py-2">Cancel</button>

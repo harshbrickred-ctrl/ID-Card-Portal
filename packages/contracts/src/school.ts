@@ -16,6 +16,7 @@ export const StudentSchema = z.object({
   fatherName: z.string().optional(),
   motherName: z.string().optional(),
   dob: z.string().optional(),
+  phoneNumber: z.string().optional(),
   bloodGroup: z.string().optional(),
   address: z.string().optional(),
   photoUrl: z.string().optional(),

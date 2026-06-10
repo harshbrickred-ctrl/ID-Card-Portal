@@ -88,6 +88,11 @@ const HEADER_MAP: Record<string, keyof StudentDto> = {
   bloodgroup: "bloodGroup",
   blood: "bloodGroup",
   address: "address",
+  phone: "phoneNumber",
+  phonenumber: "phoneNumber",
+  mobilenumber: "phoneNumber",
+  mobile: "phoneNumber",
+  contact: "phoneNumber",
 };
 
 export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buffer) {
@@ -131,6 +136,7 @@ export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buff
           fatherName: mapped.fatherName,
           motherName: mapped.motherName,
           dob: mapped.dob,
+          phoneNumber: mapped.phoneNumber,
           bloodGroup: mapped.bloodGroup,
           address: mapped.address,
         },

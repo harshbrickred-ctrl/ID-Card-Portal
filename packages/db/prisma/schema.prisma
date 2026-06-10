@@ -46,9 +46,10 @@ model Student {
   section    String
   fatherName String?
   motherName String?
-  dob        String?
-  bloodGroup String?
-  address    String?
+  dob         String?
+  phoneNumber String?
+  bloodGroup  String?
+  address     String?
   photoUrl   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
