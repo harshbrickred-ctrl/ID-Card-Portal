@@ -155,16 +155,15 @@ export async function saveStudentPhoto(studentId: string, buffer: Buffer, ext: s
   if (!student) throw new NotFoundError("Student not found");
 
   const relPath = `photos/${student.schoolId}/${student.enrollId}.${ext}`;
-  if (student.photoUrl && student.photoUrl !== relPath) {
+  if (student.photoUrl) {
     await deleteStorageFile(student.photoUrl);
   }
-  await saveFile(relPath, buffer);
-  await prisma.student.update({ where: { id: studentId }, data: { photoUrl: relPath } });
-  return { photoUrl: publicFileUrl(relPath) };
+  const stored = await saveFile(relPath, buffer);
+  await prisma.student.update({ where: { id: studentId }, data: { photoUrl: stored } });
+  return { photoUrl: publicFileUrl(stored) };
 }
 
 export async function loadStudentPhotoBuffer(photoUrl: string | null | undefined) {
   if (!photoUrl) return null;
-  const rel = photoUrl.startsWith("/api/files/") ? photoUrl.replace("/api/files/", "") : photoUrl;
-  return readStorageFile(rel);
+  return readStorageFile(photoUrl);
 }

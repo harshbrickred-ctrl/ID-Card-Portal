@@ -18,17 +18,17 @@ export async function uploadTemplate(schoolId: string, name: string, buffer: Buf
   if (!school) throw new NotFoundError("School not found");
 
   const relPath = `templates/${schoolId}/template.${ext}`;
-  await saveFile(relPath, buffer);
+  const stored = await saveFile(relPath, buffer);
 
   const template = await prisma.idCardTemplate.upsert({
     where: { schoolId },
-    create: { schoolId, name, filePath: relPath },
-    update: { name, filePath: relPath },
+    create: { schoolId, name, filePath: stored },
+    update: { name, filePath: stored },
   });
 
   return {
     ...template,
-    fileUrl: publicFileUrl(relPath),
+    fileUrl: publicFileUrl(stored),
     school,
   };
 }

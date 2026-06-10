@@ -3,6 +3,22 @@ import path from "path";
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 
+function useBlobStorage() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+}
+
+function isRemoteUrl(stored: string) {
+  return stored.startsWith("http://") || stored.startsWith("https://");
+}
+
+function normalizeRelPath(relPath: string) {
+  return relPath.split(path.sep).join("/");
+}
+
+function toRelPath(stored: string) {
+  return stored.startsWith("/api/files/") ? stored.replace("/api/files/", "") : stored;
+}
+
 export function storagePath(...parts: string[]) {
   return path.join(STORAGE_ROOT, ...parts);
 }
@@ -11,29 +27,55 @@ export async function ensureDir(dir: string) {
   await mkdir(dir, { recursive: true });
 }
 
-export async function saveFile(relPath: string, data: Buffer) {
-  const full = storagePath(relPath);
+/** Saves a file and returns the storage reference (relative path locally, public URL on Vercel Blob). */
+export async function saveFile(relPath: string, data: Buffer): Promise<string> {
+  const normalized = normalizeRelPath(relPath);
+
+  if (useBlobStorage()) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(normalized, data, {
+      access: "public",
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return blob.url;
+  }
+
+  const full = storagePath(normalized);
   await ensureDir(path.dirname(full));
   await writeFile(full, data);
-  return relPath;
+  return normalized;
 }
 
-export async function readStorageFile(relPath: string): Promise<Buffer | null> {
+export async function readStorageFile(stored: string): Promise<Buffer | null> {
   try {
-    return await readFile(storagePath(relPath));
+    if (isRemoteUrl(stored)) {
+      const res = await fetch(stored);
+      if (!res.ok) return null;
+      return Buffer.from(await res.arrayBuffer());
+    }
+
+    return await readFile(storagePath(toRelPath(stored)));
   } catch {
     return null;
   }
 }
 
-export async function deleteStorageFile(relPath: string) {
+export async function deleteStorageFile(stored: string) {
   try {
-    await unlink(storagePath(relPath));
+    if (isRemoteUrl(stored)) {
+      const { del } = await import("@vercel/blob");
+      await del(stored, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      return;
+    }
+
+    await unlink(storagePath(toRelPath(stored)));
   } catch {
     // ignore missing files
   }
 }
 
-export function publicFileUrl(relPath: string) {
-  return `/api/files/${relPath.split(path.sep).join("/")}`;
+export function publicFileUrl(stored: string): string {
+  if (isRemoteUrl(stored)) return stored;
+  return `/api/files/${normalizeRelPath(stored)}`;
 }
