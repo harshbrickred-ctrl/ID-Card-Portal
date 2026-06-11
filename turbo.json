@@ -8,7 +8,9 @@
     "PORTAL_URL",
     "BLOB_READ_WRITE_TOKEN",
     "BLOB_STORE_ID",
-    "VERCEL_OIDC_TOKEN"
+    "VERCEL_OIDC_TOKEN",
+    "CONVERTAPI_SECRET",
+    "INKSCAPE_PATH"
   ],
   "tasks": {
     "build": {

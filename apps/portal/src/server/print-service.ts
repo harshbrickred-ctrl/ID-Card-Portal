@@ -7,17 +7,21 @@ import {
 } from "@idportal/card-engine";
 import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import { loadStudentPhotoBuffer } from "./student-service";
-import { loadTemplateBuffer } from "./template-service";
+import { loadTemplateAssets } from "./template-service";
+
+const BLOCKING_ERRORS = new Set([
+  "Name is required",
+  "Enrollment ID is required",
+  "Class is required",
+  "Section is required",
+]);
 
 async function buildCardData(student: {
   enrollId: string;
   name: string;
   class: string;
   section: string;
-  fatherName: string | null;
-  motherName: string | null;
-  dob: string | null;
-  bloodGroup: string | null;
+  phoneNumber: string | null;
   address: string | null;
   photoUrl: string | null;
 }) {
@@ -27,10 +31,7 @@ async function buildCardData(student: {
     name: student.name,
     class: student.class,
     section: student.section,
-    fatherName: student.fatherName,
-    motherName: student.motherName,
-    dob: student.dob,
-    bloodGroup: student.bloodGroup,
+    phoneNumber: student.phoneNumber,
     address: student.address,
     photoBuffer,
   };
@@ -40,7 +41,7 @@ export async function previewCards(schoolId: string, studentIds: string[]) {
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) throw new NotFoundError("School not found");
 
-  const templateBuffer = await loadTemplateBuffer(schoolId);
+  const { templateBuffer, signatureBuffer, hasTemplate } = await loadTemplateAssets(schoolId);
   const students = await prisma.student.findMany({
     where: { id: { in: studentIds }, schoolId },
   });
@@ -57,14 +58,13 @@ export async function previewCards(schoolId: string, studentIds: string[]) {
     students.map(async (s) => {
       const cardStudent = await buildCardData(s);
       const errors = validateStudentCard(cardStudent);
-      const hasErrors = errors.some((e) =>
-        ["Name is required", "Enrollment ID is required", "Class is required", "Section is required"].includes(e),
-      );
+      const hasErrors = errors.some((e) => BLOCKING_ERRORS.has(e));
 
       const front = await renderStudentCard({
         student: cardStudent,
         school: schoolData,
         templateBuffer,
+        signatureBuffer,
       });
 
       return {
@@ -82,7 +82,7 @@ export async function previewCards(schoolId: string, studentIds: string[]) {
 
   return {
     school: { id: school.id, name: school.name, code: school.code, accentColor: school.accentColor },
-    hasTemplate: !!templateBuffer,
+    hasTemplate,
     previews,
     canPrint: previews.every((p) => !p.hasErrors),
   };
@@ -97,7 +97,7 @@ export async function executePrint(schoolId: string, studentIds: string[]) {
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) throw new NotFoundError("School not found");
 
-  const templateBuffer = await loadTemplateBuffer(schoolId);
+  const { templateBuffer, signatureBuffer } = await loadTemplateAssets(schoolId);
   const students = await prisma.student.findMany({
     where: { id: { in: studentIds }, schoolId },
   });
@@ -112,7 +112,12 @@ export async function executePrint(schoolId: string, studentIds: string[]) {
     students.map(async (s) => {
       const cardStudent = await buildCardData(s);
       const [front, back] = await Promise.all([
-        renderStudentCard({ student: cardStudent, school: schoolData, templateBuffer }),
+        renderStudentCard({
+          student: cardStudent,
+          school: schoolData,
+          templateBuffer,
+          signatureBuffer,
+        }),
         renderStudentCardBack(cardStudent, schoolData),
       ]);
       return { enrollId: s.enrollId, name: s.name, front, back };

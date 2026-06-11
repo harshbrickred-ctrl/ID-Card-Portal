@@ -122,7 +122,7 @@ export default function PrintPage() {
     <div>
       <PageHeader
         title="Print ID Cards"
-        description="Select students, preview cards, fix errors, then print"
+        description="Generate unlimited student ID cards from the school template — each card uses the same layout and signature"
       />
 
       <GlassCard className="mb-6">
@@ -141,7 +141,9 @@ export default function PrintPage() {
             <Badge color={selectedSchool.accentColor}>{selectedSchool.code}</Badge>
           ) : null}
           <p className="text-sm text-[var(--muted-foreground)]">
-            Template is auto-fetched per school. Default layout used if none uploaded.
+            {preview?.hasTemplate === false && step === "preview"
+              ? "No custom template — using default card layout."
+              : "School template + principal signature are applied to every card. Student name, enroll ID, class, phone, address, and photo change per student."}
           </p>
         </div>
       </GlassCard>

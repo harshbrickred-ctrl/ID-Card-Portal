@@ -48,11 +48,12 @@ export type StudentCardData = {
   name: string;
   class: string;
   section: string;
+  phoneNumber?: string | null;
+  address?: string | null;
   fatherName?: string | null;
   motherName?: string | null;
   dob?: string | null;
   bloodGroup?: string | null;
-  address?: string | null;
   photoBuffer?: Buffer | null;
 };
 
