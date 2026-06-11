@@ -8,13 +8,26 @@ $ErrorActionPreference = "Stop"
 $corel = $null
 $doc = $null
 
+function Try-ExportBitmap([object]$document, [string]$path) {
+  $document.ExportBitmap($path, 769, 2, 1, 1011, 638, 300, 300, 1, 0, 0, 0)
+}
+
+function Try-ExportPng([object]$document, [string]$path) {
+  $document.Export($path, 769, 0)
+}
+
 try {
   $corel = New-Object -ComObject CorelDRAW.Application
   $corel.Visible = $false
   $doc = $corel.OpenDocument($InputPath)
 
-  # cdrPNG = 769 in CorelDRAW VBA; ExportBitmap is the most reliable export path.
-  $doc.ExportBitmap($OutputPath, 769, 2, 1, 1011, 638, 300, 300, 1, 0, 0, 0)
+  try {
+    Try-ExportBitmap $doc $OutputPath
+  }
+  catch {
+    Try-ExportPng $doc $OutputPath
+  }
+
   $doc.Close()
 }
 catch {

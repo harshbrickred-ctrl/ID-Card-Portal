@@ -3,6 +3,7 @@ import { BadRequestError, requireAuth, withApi } from "@idportal/api-kit";
 
 export const maxDuration = 120;
 import { resolveImageExtension } from "@/server/image-utils";
+import { getCdrConversionCapabilities } from "@/server/cdr-converter";
 import { resolveTemplateFormat } from "@/server/template-utils";
 import * as templateService from "@/server/template-service";
 
@@ -39,6 +40,10 @@ export const POST = withApi(async (req) => {
       buffer: Buffer.from(await previewFile.arrayBuffer()),
       format: previewFormat,
     };
+  } else if (format === "cdr" && getCdrConversionCapabilities().cdrNeedsFallback) {
+    throw new BadRequestError(
+      "CDR upload on cloud requires a PNG or PDF export from CorelDRAW, or CONVERTAPI_SECRET in environment variables.",
+    );
   }
 
   let signatureInput: { buffer: Buffer; ext: string } | null = null;

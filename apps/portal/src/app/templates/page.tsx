@@ -33,6 +33,14 @@ export default function TemplatesPage() {
 
   const isCdrUpload = file?.name.toLowerCase().endsWith(".cdr") ?? false;
   const [loadError, setLoadError] = useState("");
+  const [cdrCaps, setCdrCaps] = useState<{
+    convertApi: boolean;
+    cdrNeedsFallback: boolean;
+    inkscapeFound: boolean;
+    onVercel: boolean;
+  } | null>(null);
+
+  const cdrNeedsExportFile = isCdrUpload && (cdrCaps?.cdrNeedsFallback ?? false);
 
   async function load() {
     setLoadError("");
@@ -63,6 +71,14 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     void load();
+    apiFetch<{
+      convertApi: boolean;
+      cdrNeedsFallback: boolean;
+      inkscapeFound: boolean;
+      onVercel: boolean;
+    }>("/v1/templates/capabilities")
+      .then(setCdrCaps)
+      .catch(() => null);
   }, []);
 
   async function removeTemplate(id: string, templateName: string) {
@@ -78,6 +94,13 @@ export default function TemplatesPage() {
   async function upload(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !schoolId) return;
+    if (cdrNeedsExportFile && !previewFile) {
+      setMessageType("error");
+      setMessage(
+        "Cloud hosting cannot convert CDR directly. Add a PNG or PDF export from CorelDRAW in the field below, or set CONVERTAPI_SECRET in Vercel.",
+      );
+      return;
+    }
     setLoading(true);
     setMessage("");
     try {
@@ -155,20 +178,37 @@ export default function TemplatesPage() {
             </div>
             {isCdrUpload ? (
               <div>
-                <p className="mb-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
-                  <strong className="text-[var(--angora-goat)]">CDR auto-conversion:</strong> we convert your .cdr to PNG
-                  automatically using CorelDRAW (Windows), Inkscape, or cloud conversion. Conversion may take up to a
-                  minute.
-                </p>
+                {cdrNeedsExportFile ? (
+                  <p className="mb-2 rounded-xl border border-[var(--cinema-screen)]/40 bg-[var(--cinema-screen)]/10 p-3 text-xs text-[var(--angora-goat)]">
+                    <strong>Required on cloud:</strong> Vercel cannot run CorelDRAW/Inkscape. Export your design from
+                    CorelDRAW as PNG (1011×638 px) or PDF and attach it below. Your .cdr is still stored as the master
+                    file. Or add <code className="text-[var(--orchid-hush)]">CONVERTAPI_SECRET</code> in Vercel env vars
+                    for automatic conversion.
+                  </p>
+                ) : (
+                  <p className="mb-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
+                    <strong className="text-[var(--angora-goat)]">CDR auto-conversion:</strong> we try CorelDRAW
+                    (Windows), Inkscape, or ConvertAPI. Conversion may take up to a minute.
+                    {cdrCaps?.inkscapeFound ? " Inkscape detected." : null}
+                  </p>
+                )}
                 <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
-                  Optional fallback — PNG or PDF export (only if auto-conversion fails)
+                  {cdrNeedsExportFile
+                    ? "Print-ready PNG or PDF export from CorelDRAW (required)"
+                    : "Optional fallback — PNG or PDF export (if auto-conversion fails)"}
                 </label>
                 <input
                   className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf"
                   onChange={(e) => setPreviewFile(e.target.files?.[0] ?? null)}
+                  required={cdrNeedsExportFile}
                 />
+                {cdrNeedsExportFile ? (
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                    In CorelDRAW: File → Export → PNG, or File → Publish to PDF.
+                  </p>
+                ) : null}
               </div>
             ) : null}
             <div>
