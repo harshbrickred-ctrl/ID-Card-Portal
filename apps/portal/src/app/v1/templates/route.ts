@@ -42,7 +42,7 @@ export const POST = withApi(async (req) => {
     };
   } else if (format === "cdr" && getCdrConversionCapabilities().cdrNeedsFallback) {
     throw new BadRequestError(
-      "CDR upload on cloud requires a PNG or PDF export from CorelDRAW, or CONVERTAPI_SECRET in environment variables.",
+      "CDR upload on cloud requires a PNG or PDF export from CorelDRAW, or CLOUDCONVERT_API_KEY in environment variables.",
     );
   }
 

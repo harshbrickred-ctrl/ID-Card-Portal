@@ -15,6 +15,26 @@ type ConvertApiResponse = {
   Message?: string;
 };
 
+type CloudConvertTask = {
+  id: string;
+  name?: string;
+  operation: string;
+  status: string;
+  message?: string | null;
+  result?: {
+    form?: { url: string; parameters: Record<string, string> };
+    files?: { url: string }[];
+  };
+};
+
+type CloudConvertJob = {
+  data: {
+    id: string;
+    status: string;
+    tasks: CloudConvertTask[];
+  };
+};
+
 const WINDOWS_INKSCAPE_PATHS = [
   "C:\\Program Files\\Inkscape\\bin\\inkscape.exe",
   "C:\\Program Files\\Inkscape\\inkscape.exe",
@@ -37,6 +57,10 @@ async function fileExists(filePath: string) {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function getInkscapeCandidates(): Promise<string[]> {
   const candidates = [
     process.env.INKSCAPE_PATH?.trim(),
@@ -56,17 +80,21 @@ export async function getInkscapeCandidates(): Promise<string[]> {
 }
 
 export function getCdrConversionCapabilities() {
-  const convertApi = Boolean(process.env.CONVERTAPI_SECRET?.trim());
+  const cloudConvert = Boolean(process.env.CLOUDCONVERT_API_KEY?.trim());
+  const convertApi = Boolean(
+    process.env.CONVERTAPI_SECRET?.trim() || process.env.CONVERTAPI_TOKEN?.trim(),
+  );
   const corelDrawWindows = process.platform === "win32";
   const inkscapeConfigured = Boolean(process.env.INKSCAPE_PATH?.trim());
   const onVercel = process.env.VERCEL === "1";
 
   return {
+    cloudConvert,
     convertApi,
     corelDrawWindows,
     inkscapeConfigured,
     onVercel,
-    cdrNeedsFallback: onVercel && !convertApi,
+    cdrNeedsFallback: onVercel && !cloudConvert,
   };
 }
 
@@ -78,6 +106,106 @@ async function withTempCdr<T>(buffer: Buffer, run: (input: string, tmpDir: strin
     return await run(input, tmpDir);
   } finally {
     await rm(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function pollCloudConvertJob(jobId: string, apiKey: string, maxWaitMs = 120_000): Promise<CloudConvertJob> {
+  const started = Date.now();
+  while (Date.now() - started < maxWaitMs) {
+    const res = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`CloudConvert poll failed (${res.status}): ${errText}`);
+    }
+
+    const json = (await res.json()) as CloudConvertJob;
+    if (json.data.status === "finished") return json;
+    if (json.data.status === "error") {
+      const failedTask = json.data.tasks.find((task) => task.status === "error");
+      throw new Error(failedTask?.message ?? "CloudConvert job failed");
+    }
+
+    await sleep(2_000);
+  }
+
+  throw new Error("CloudConvert conversion timed out after 2 minutes");
+}
+
+export async function tryCloudConvertCdr(buffer: Buffer): Promise<Buffer | null> {
+  const apiKey = process.env.CLOUDCONVERT_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  try {
+    const createRes = await fetch("https://api.cloudconvert.com/v2/jobs", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tasks: {
+          "import-cdr": { operation: "import/upload" },
+          "convert-cdr": {
+            operation: "convert",
+            input: "import-cdr",
+            input_format: "cdr",
+            output_format: "png",
+            width: CARD_WIDTH,
+          },
+          "export-png": {
+            operation: "export/url",
+            input: "convert-cdr",
+          },
+        },
+      }),
+    });
+
+    if (!createRes.ok) {
+      const errText = await createRes.text().catch(() => "");
+      console.error("CloudConvert job create failed:", createRes.status, errText);
+      return null;
+    }
+
+    const job = (await createRes.json()) as CloudConvertJob;
+    const uploadTask = job.data.tasks.find((task) => task.operation === "import/upload");
+    const form = uploadTask?.result?.form;
+    if (!form) {
+      console.error("CloudConvert import/upload task missing upload form");
+      return null;
+    }
+
+    const uploadBody = new FormData();
+    for (const [key, value] of Object.entries(form.parameters)) {
+      uploadBody.append(key, value);
+    }
+    uploadBody.append(
+      "file",
+      new Blob([new Uint8Array(buffer)], { type: "application/vnd.corel-draw" }),
+      "template.cdr",
+    );
+
+    const uploadRes = await fetch(form.url, { method: "POST", body: uploadBody });
+    if (!uploadRes.ok) {
+      console.error("CloudConvert upload failed:", uploadRes.status, await uploadRes.text().catch(() => ""));
+      return null;
+    }
+
+    const finished = await pollCloudConvertJob(job.data.id, apiKey);
+    const exportTask = finished.data.tasks.find((task) => task.operation === "export/url");
+    const fileUrl = exportTask?.result?.files?.[0]?.url;
+    if (!fileUrl) {
+      console.error("CloudConvert export task missing file URL");
+      return null;
+    }
+
+    const img = await fetch(fileUrl);
+    if (!img.ok) return null;
+    return normalizeRaster(Buffer.from(await img.arrayBuffer()));
+  } catch (err) {
+    console.error("CloudConvert CDR conversion error:", err);
+    return null;
   }
 }
 
@@ -118,8 +246,10 @@ export async function tryCorelDrawWindowsCdr(buffer: Buffer): Promise<Buffer | n
   }).catch(() => null);
 }
 
+/** @deprecated ConvertAPI does not support CDR — kept for potential future formats */
 export async function tryConvertApiCdr(buffer: Buffer): Promise<Buffer | null> {
-  const secret = process.env.CONVERTAPI_SECRET?.trim();
+  const secret =
+    process.env.CONVERTAPI_SECRET?.trim() || process.env.CONVERTAPI_TOKEN?.trim();
   if (!secret) return null;
 
   try {
@@ -156,19 +286,25 @@ export async function tryConvertApiCdr(buffer: Buffer): Promise<Buffer | null> {
 }
 
 function buildCdrHelp(capabilities: ReturnType<typeof getCdrConversionCapabilities>) {
-  if (capabilities.onVercel && !capabilities.convertApi) {
-    return "CDR auto-conversion on Vercel requires CONVERTAPI_SECRET. Sign up at convertapi.com, add the secret to Vercel env vars, redeploy, or upload an optional PNG/PDF export from CorelDRAW below.";
+  if (capabilities.onVercel && !capabilities.cloudConvert) {
+    return "CDR auto-conversion on Vercel requires CLOUDCONVERT_API_KEY (ConvertAPI does not support CDR). Sign up at cloudconvert.com, add the API key to Vercel env vars, redeploy, or upload a PNG/PDF export from CorelDRAW below.";
+  }
+  if (capabilities.cloudConvert) {
+    return "CDR conversion via CloudConvert failed. Check your CLOUDCONVERT_API_KEY and account quota, or upload a PNG/PDF export from CorelDRAW below.";
+  }
+  if (capabilities.convertApi && !capabilities.cloudConvert) {
+    return "CONVERTAPI_SECRET does not support CDR files. Use CLOUDCONVERT_API_KEY for cloud conversion, install Inkscape/CorelDRAW locally, or upload a PNG/PDF export from CorelDRAW below.";
   }
   if (process.platform === "win32") {
-    return "CDR could not be converted. Install Inkscape (inkscape.org), ensure CorelDRAW is installed, set CONVERTAPI_SECRET, or upload an optional PNG/PDF export from CorelDRAW below.";
+    return "CDR could not be converted. Install Inkscape (inkscape.org), ensure CorelDRAW is installed, set CLOUDCONVERT_API_KEY, or upload a PNG/PDF export from CorelDRAW below.";
   }
-  return "CDR could not be converted on this server. Set CONVERTAPI_SECRET or upload an optional PNG/PDF export from CorelDRAW below.";
+  return "CDR could not be converted on this server. Set CLOUDCONVERT_API_KEY or upload a PNG/PDF export from CorelDRAW below.";
 }
 
 export async function convertCdrToPng(buffer: Buffer): Promise<Buffer> {
   const capabilities = getCdrConversionCapabilities();
   const converted =
-    (await tryConvertApiCdr(buffer)) ??
+    (await tryCloudConvertCdr(buffer)) ??
     (await tryInkscapeCdr(buffer)) ??
     (await tryCorelDrawWindowsCdr(buffer));
 

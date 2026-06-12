@@ -10,6 +10,8 @@
     "BLOB_STORE_ID",
     "VERCEL_OIDC_TOKEN",
     "CONVERTAPI_SECRET",
+    "CONVERTAPI_TOKEN",
+    "CLOUDCONVERT_API_KEY",
     "INKSCAPE_PATH"
   ],
   "tasks": {

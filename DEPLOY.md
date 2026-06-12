@@ -16,6 +16,10 @@ Add these in **Vercel → Project → Settings → Environment Variables** for *
 | `JWT_SECRET` | Random string, at least 32 characters |
 | `PORTAL_URL` | Your deployed URL, e.g. `https://your-app.vercel.app` |
 | `NEXT_PUBLIC_PORTAL_URL` | Same as `PORTAL_URL` |
+| `BLOB_STORE_ID` | Vercel Blob store (auto-set when Blob is linked) |
+| `CLOUDCONVERT_API_KEY` | **Required for CDR uploads on Vercel** — get a key at [cloudconvert.com](https://cloudconvert.com) |
+
+**CDR templates on Vercel:** ConvertAPI does not support CorelDRAW `.cdr` files. Set `CLOUDCONVERT_API_KEY`, redeploy, or upload a PNG/PDF export alongside the `.cdr`.
 
 **Important:** If `DATABASE_URL` is missing, sign-in will fail with a Prisma error. After adding or changing env vars, **redeploy** the project.
 

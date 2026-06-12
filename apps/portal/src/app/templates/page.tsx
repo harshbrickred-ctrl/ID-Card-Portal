@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Upload, FileImage, Trash2, PenLine } from "lucide-react";
-import { apiFetch } from "@/lib/api/client";
+import { Upload, FileImage, Trash2, PenLine, Loader2 } from "lucide-react";
+import { apiFetch, apiUploadFormData, type UploadProgressPhase } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth-store";
 import { Badge, GlassCard, PageHeader } from "@/components/ui";
 
@@ -28,12 +28,17 @@ export default function TemplatesPage() {
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [signature, setSignature] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    phase: UploadProgressPhase;
+    percent: number;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
 
   const isCdrUpload = file?.name.toLowerCase().endsWith(".cdr") ?? false;
   const [loadError, setLoadError] = useState("");
   const [cdrCaps, setCdrCaps] = useState<{
+    cloudConvert: boolean;
     convertApi: boolean;
     cdrNeedsFallback: boolean;
     inkscapeFound: boolean;
@@ -72,6 +77,7 @@ export default function TemplatesPage() {
   useEffect(() => {
     void load();
     apiFetch<{
+      cloudConvert: boolean;
       convertApi: boolean;
       cdrNeedsFallback: boolean;
       inkscapeFound: boolean;
@@ -97,11 +103,12 @@ export default function TemplatesPage() {
     if (cdrNeedsExportFile && !previewFile) {
       setMessageType("error");
       setMessage(
-        "Cloud hosting cannot convert CDR directly. Add a PNG or PDF export from CorelDRAW in the field below, or set CONVERTAPI_SECRET in Vercel.",
+        "Cloud hosting cannot convert CDR directly. Add a PNG or PDF export from CorelDRAW in the field below, or set CLOUDCONVERT_API_KEY in Vercel.",
       );
       return;
     }
     setLoading(true);
+    setUploadProgress({ phase: "uploading", percent: 0 });
     setMessage("");
     try {
       const fd = new FormData();
@@ -110,7 +117,9 @@ export default function TemplatesPage() {
       fd.append("file", file);
       if (previewFile) fd.append("preview", previewFile);
       if (signature) fd.append("signature", signature);
-      await apiFetch("/v1/templates", { method: "POST", body: fd });
+      await apiUploadFormData("/v1/templates", fd, (phase, percent) => {
+        setUploadProgress({ phase, percent });
+      });
       setMessageType("success");
       setMessage("Template uploaded. Preview is ready — you can now generate ID cards for all students.");
       setFile(null);
@@ -123,11 +132,61 @@ export default function TemplatesPage() {
       setMessage(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   }
 
+  const progressLabel =
+    uploadProgress?.phase === "uploading"
+      ? `Uploading template… ${uploadProgress.percent}%`
+      : uploadProgress?.phase === "processing" && isCdrUpload
+        ? "Converting CDR to PNG…"
+        : uploadProgress?.phase === "processing"
+          ? "Processing template…"
+          : "Finishing up…";
+
+  const progressHint =
+    uploadProgress?.phase === "processing" && isCdrUpload
+      ? "Cloud conversion can take up to 2 minutes. Please keep this tab open."
+      : uploadProgress?.phase === "uploading"
+        ? "Sending your file to the server."
+        : "Almost done.";
+
   return (
     <div>
+      {uploadProgress ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1a1228] p-8 text-center shadow-2xl">
+            <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[var(--orchid-hush)]" />
+            <p className="text-lg font-semibold text-[var(--angora-goat)]">{progressLabel}</p>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)]">{progressHint}</p>
+            {uploadProgress.phase === "uploading" ? (
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[var(--orchid-hush)] transition-all duration-300"
+                  style={{ width: `${uploadProgress.percent}%` }}
+                />
+              </div>
+            ) : (
+              <div className="mt-5 flex justify-center gap-1">
+                {[0, 1, 2].map((dot) => (
+                  <span
+                    key={dot}
+                    className="h-2 w-2 animate-pulse rounded-full bg-[var(--orchid-hush)]"
+                    style={{ animationDelay: `${dot * 200}ms` }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <PageHeader
         title="ID Card Templates"
         description="Upload the school card design once — student data is filled in automatically for every print"
@@ -182,14 +241,20 @@ export default function TemplatesPage() {
                   <p className="mb-2 rounded-xl border border-[var(--cinema-screen)]/40 bg-[var(--cinema-screen)]/10 p-3 text-xs text-[var(--angora-goat)]">
                     <strong>Required on cloud:</strong> Vercel cannot run CorelDRAW/Inkscape. Export your design from
                     CorelDRAW as PNG (1011×638 px) or PDF and attach it below. Your .cdr is still stored as the master
-                    file. Or add <code className="text-[var(--orchid-hush)]">CONVERTAPI_SECRET</code> in Vercel env vars
+                    file. Or add <code className="text-[var(--orchid-hush)]">CLOUDCONVERT_API_KEY</code> in Vercel env vars
                     for automatic conversion.
                   </p>
                 ) : (
                   <p className="mb-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
-                    <strong className="text-[var(--angora-goat)]">CDR auto-conversion:</strong> we try CorelDRAW
-                    (Windows), Inkscape, or ConvertAPI. Conversion may take up to a minute.
+                    <strong className="text-[var(--angora-goat)]">CDR auto-conversion:</strong> we try CloudConvert
+                    (Vercel), CorelDRAW (Windows), or Inkscape. Conversion may take up to 2 minutes.
+                    {cdrCaps?.cloudConvert ? " CloudConvert ready." : null}
                     {cdrCaps?.inkscapeFound ? " Inkscape detected." : null}
+                    {cdrCaps?.convertApi && !cdrCaps.cloudConvert ? (
+                      <span className="mt-1 block text-warning">
+                        CONVERTAPI_SECRET does not support CDR — use CLOUDCONVERT_API_KEY on Vercel.
+                      </span>
+                    ) : null}
                   </p>
                 )}
                 <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
@@ -226,7 +291,7 @@ export default function TemplatesPage() {
             <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
               <p className="mb-2 font-medium text-[var(--angora-goat)]">CorelDRAW / industry formats</p>
               <ul className="space-y-1">
-                <li>• <strong>.cdr</strong> — auto-converted to PNG (CorelDRAW on Windows, Inkscape, or cloud API).</li>
+                <li>• <strong>.cdr</strong> — auto-converted to PNG (CloudConvert on Vercel, Inkscape/CorelDRAW locally).</li>
                 <li>• <strong>.pdf / .png / .jpg</strong> — single-file upload works directly.</li>
                 <li>• Principal signature is uploaded separately and stays the same on every card.</li>
                 <li>• Per student: photo, name, enroll ID, class/section, phone, address are filled automatically.</li>
@@ -236,7 +301,7 @@ export default function TemplatesPage() {
               <p className={`text-sm ${messageType === "error" ? "text-[var(--danger)]" : "text-success"}`}>{message}</p>
             ) : null}
             <button type="submit" disabled={loading} className="btn-primary w-full rounded-xl py-2.5">
-              {loading ? (isCdrUpload ? "Converting CDR…" : "Uploading…") : "Save Template"}
+              {loading ? "Working…" : "Save Template"}
             </button>
           </form>
         </GlassCard>

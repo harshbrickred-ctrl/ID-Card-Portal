@@ -26,6 +26,51 @@ export function clearToken() {
   localStorage.removeItem("idportal-token");
 }
 
+export type UploadProgressPhase = "uploading" | "processing" | "done";
+
+export function apiUploadFormData<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (phase: UploadProgressPhase, percent: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const token = getToken();
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}${path}`);
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+        onProgress?.("uploading", percent);
+      }
+    });
+
+    xhr.upload.addEventListener("loadend", () => {
+      onProgress?.("processing", 100);
+    });
+
+    xhr.addEventListener("load", () => {
+      try {
+        const json = JSON.parse(xhr.responseText) as { success?: boolean; data?: T; error?: { message?: string | string[] } };
+        if (xhr.status >= 200 && xhr.status < 300 && json.success !== false) {
+          onProgress?.("done", 100);
+          resolve(json.data as T);
+          return;
+        }
+        const msg = json?.error?.message ?? xhr.statusText;
+        reject(new ApiError(Array.isArray(msg) ? msg.join("; ") : String(msg), xhr.status));
+      } catch {
+        reject(new ApiError("Upload failed", xhr.status));
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new ApiError("Network error during upload", 0)));
+    xhr.addEventListener("abort", () => reject(new ApiError("Upload cancelled", 0)));
+    xhr.send(formData);
+  });
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const isForm = init?.body instanceof FormData;
