@@ -3,7 +3,6 @@ import { BadRequestError, requireAuth, withApi } from "@idportal/api-kit";
 
 export const maxDuration = 120;
 import { resolveImageExtension } from "@/server/image-utils";
-import { getCdrConversionCapabilities } from "@/server/cdr-converter";
 import { resolveTemplateFormat } from "@/server/template-utils";
 import * as templateService from "@/server/template-service";
 
@@ -29,23 +28,6 @@ export const POST = withApi(async (req) => {
   const format = resolveTemplateFormat(file);
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const previewFile = form.get("preview");
-  let previewInput: { buffer: Buffer; format: ReturnType<typeof resolveTemplateFormat> } | null = null;
-  if (previewFile instanceof File && previewFile.size > 0) {
-    const previewFormat = resolveTemplateFormat(previewFile);
-    if (previewFormat === "cdr") {
-      throw new BadRequestError("Print-ready preview must be PNG, JPG, WebP, or PDF — not CDR");
-    }
-    previewInput = {
-      buffer: Buffer.from(await previewFile.arrayBuffer()),
-      format: previewFormat,
-    };
-  } else if (format === "cdr" && getCdrConversionCapabilities().cdrNeedsFallback) {
-    throw new BadRequestError(
-      "CDR upload on cloud requires a PNG or PDF export from CorelDRAW, or CLOUDCONVERT_API_KEY in environment variables.",
-    );
-  }
-
   let signatureInput: { buffer: Buffer; ext: string } | null = null;
   if (signature instanceof File && signature.size > 0) {
     signatureInput = {
@@ -54,5 +36,5 @@ export const POST = withApi(async (req) => {
     };
   }
 
-  return templateService.uploadTemplate(schoolId, name.trim(), buffer, format, signatureInput, previewInput);
+  return templateService.uploadTemplate(schoolId, name.trim(), buffer, format, signatureInput);
 });

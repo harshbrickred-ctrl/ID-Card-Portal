@@ -17,9 +17,8 @@ Add these in **Vercel → Project → Settings → Environment Variables** for *
 | `PORTAL_URL` | Your deployed URL, e.g. `https://your-app.vercel.app` |
 | `NEXT_PUBLIC_PORTAL_URL` | Same as `PORTAL_URL` |
 | `BLOB_STORE_ID` | Vercel Blob store (auto-set when Blob is linked) |
-| `CLOUDCONVERT_API_KEY` | **Required for CDR uploads on Vercel** — get a key at [cloudconvert.com](https://cloudconvert.com) |
 
-**CDR templates on Vercel:** ConvertAPI does not support CorelDRAW `.cdr` files. Set `CLOUDCONVERT_API_KEY`, redeploy, or upload a PNG/PDF export alongside the `.cdr`.
+**PDF templates:** Upload a PDF exported at **85.6×53.98 mm** (CR-80, 300 DPI). The server converts page 1 to **1011×638 px** automatically — works on Vercel with no extra software. PNG and JPG are also accepted.
 
 **Important:** If `DATABASE_URL` is missing, sign-in will fail with a Prisma error. After adding or changing env vars, **redeploy** the project.
 

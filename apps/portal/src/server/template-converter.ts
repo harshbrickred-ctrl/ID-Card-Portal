@@ -1,53 +1,52 @@
 import { BadRequestError } from "@idportal/api-kit";
-import { CARD_HEIGHT, CARD_WIDTH } from "@idportal/card-engine";
-import sharp from "sharp";
-import { convertCdrToPng } from "./cdr-converter";
+import { CARD_HEIGHT, CARD_WIDTH, fitTemplateRaster, preserveExactTemplateRaster } from "@idportal/card-engine";
 import type { TemplateSourceFormat } from "./template-utils";
 import { isRasterTemplateFormat } from "./template-utils";
+import { pdfToPng } from "./pdf-render";
 
-async function normalizeRaster(buffer: Buffer): Promise<Buffer> {
-  return sharp(buffer)
-    .resize(CARD_WIDTH, CARD_HEIGHT, { fit: "contain", background: "#ffffff" })
-    .png()
-    .toBuffer();
-}
+const PDF_PAGE_OPTS = {
+  disableFontFace: true,
+  useSystemFonts: true,
+  pagesToProcess: [1] as number[],
+};
 
 async function rasterizePdf(buffer: Buffer): Promise<Buffer> {
-  const { pdfToPng } = await import("pdf-to-png-converter");
+  const metadata = await pdfToPng(buffer, {
+    ...PDF_PAGE_OPTS,
+    returnMetadataOnly: true,
+    viewportScale: 1,
+  });
+  const meta = metadata[0];
+  if (!meta || meta.width <= 0 || meta.height <= 0) {
+    throw new BadRequestError("PDF template has no pages to render");
+  }
+
+  const viewportScale = Math.min(CARD_WIDTH / meta.width, CARD_HEIGHT / meta.height);
+
   const pages = await pdfToPng(buffer, {
-    disableFontFace: true,
-    useSystemFonts: true,
-    viewportScale: 2,
+    ...PDF_PAGE_OPTS,
+    viewportScale,
   });
   const first = pages[0];
   if (!first?.content) {
-    throw new BadRequestError("PDF template has no pages to render");
+    throw new BadRequestError("PDF template could not be rendered");
   }
-  return normalizeRaster(Buffer.from(first.content));
+
+  const raster = Buffer.from(first.content);
+  try {
+    return await preserveExactTemplateRaster(raster);
+  } catch {
+    return fitTemplateRaster(raster);
+  }
 }
 
-export async function rasterizeTemplate(
-  buffer: Buffer,
-  format: TemplateSourceFormat,
-  preview?: { buffer: Buffer; format: TemplateSourceFormat } | null,
-): Promise<Buffer> {
+export async function rasterizeTemplate(buffer: Buffer, format: TemplateSourceFormat): Promise<Buffer> {
   if (isRasterTemplateFormat(format)) {
-    return normalizeRaster(buffer);
+    return fitTemplateRaster(buffer);
   }
 
   if (format === "pdf") {
     return rasterizePdf(buffer);
-  }
-
-  if (format === "cdr") {
-    try {
-      return await convertCdrToPng(buffer);
-    } catch (err) {
-      if (preview) {
-        return rasterizeTemplate(preview.buffer, preview.format);
-      }
-      throw err;
-    }
   }
 
   throw new BadRequestError("Unsupported template format");

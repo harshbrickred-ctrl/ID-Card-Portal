@@ -39,13 +39,12 @@ export async function uploadTemplate(
   buffer: Buffer,
   format: TemplateSourceFormat,
   signature?: { buffer: Buffer; ext: string } | null,
-  preview?: { buffer: Buffer; format: TemplateSourceFormat } | null,
 ) {
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) throw new NotFoundError("School not found");
 
   const existing = await prisma.idCardTemplate.findUnique({ where: { schoolId } });
-  const rasterBuffer = await rasterizeTemplate(buffer, format, preview);
+  const rasterBuffer = await rasterizeTemplate(buffer, format);
   const renderPath = `templates/${schoolId}/template.png`;
   const stored = await saveFile(renderPath, rasterBuffer);
 

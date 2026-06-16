@@ -6,7 +6,7 @@ Simple MVP for school student ID card printing.
 
 - **Login** — credential-based admin access
 - **Dashboard** — schools, students, and print analytics
-- **Templates** — upload per-school ID card background images
+- **Templates** — upload per-school ID card designs (PDF recommended; PNG/JPG also supported)
 - **Students** — import from Excel, edit records, upload photos
 - **Print** — filter by enroll ID / name / class / section, preview cards, download ZIP for printing
 

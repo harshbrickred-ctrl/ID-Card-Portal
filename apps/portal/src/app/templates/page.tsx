@@ -19,13 +19,12 @@ type Template = {
 };
 
 export default function TemplatesPage() {
-  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
+  const isAdmin = useAuthStore((s) => Boolean(s.user));
   const [schools, setSchools] = useState<School[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [schoolId, setSchoolId] = useState("");
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [signature, setSignature] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
@@ -34,18 +33,9 @@ export default function TemplatesPage() {
   } | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
-
-  const isCdrUpload = file?.name.toLowerCase().endsWith(".cdr") ?? false;
   const [loadError, setLoadError] = useState("");
-  const [cdrCaps, setCdrCaps] = useState<{
-    cloudConvert: boolean;
-    convertApi: boolean;
-    cdrNeedsFallback: boolean;
-    inkscapeFound: boolean;
-    onVercel: boolean;
-  } | null>(null);
 
-  const cdrNeedsExportFile = isCdrUpload && (cdrCaps?.cdrNeedsFallback ?? false);
+  const isPdfUpload = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
   async function load() {
     setLoadError("");
@@ -76,15 +66,6 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     void load();
-    apiFetch<{
-      cloudConvert: boolean;
-      convertApi: boolean;
-      cdrNeedsFallback: boolean;
-      inkscapeFound: boolean;
-      onVercel: boolean;
-    }>("/v1/templates/capabilities")
-      .then(setCdrCaps)
-      .catch(() => null);
   }, []);
 
   async function removeTemplate(id: string, templateName: string) {
@@ -100,13 +81,6 @@ export default function TemplatesPage() {
   async function upload(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !schoolId) return;
-    if (cdrNeedsExportFile && !previewFile) {
-      setMessageType("error");
-      setMessage(
-        "Cloud hosting cannot convert CDR directly. Add a PNG or PDF export from CorelDRAW in the field below, or set CLOUDCONVERT_API_KEY in Vercel.",
-      );
-      return;
-    }
     setLoading(true);
     setUploadProgress({ phase: "uploading", percent: 0 });
     setMessage("");
@@ -115,7 +89,6 @@ export default function TemplatesPage() {
       fd.append("schoolId", schoolId);
       fd.append("name", name || "School ID Template");
       fd.append("file", file);
-      if (previewFile) fd.append("preview", previewFile);
       if (signature) fd.append("signature", signature);
       await apiUploadFormData("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
@@ -123,7 +96,6 @@ export default function TemplatesPage() {
       setMessageType("success");
       setMessage("Template uploaded. Preview is ready — you can now generate ID cards for all students.");
       setFile(null);
-      setPreviewFile(null);
       setSignature(null);
       setName("");
       await load();
@@ -139,15 +111,15 @@ export default function TemplatesPage() {
   const progressLabel =
     uploadProgress?.phase === "uploading"
       ? `Uploading template… ${uploadProgress.percent}%`
-      : uploadProgress?.phase === "processing" && isCdrUpload
-        ? "Converting CDR to PNG…"
+      : uploadProgress?.phase === "processing" && isPdfUpload
+        ? "Converting PDF to print-ready image…"
         : uploadProgress?.phase === "processing"
           ? "Processing template…"
           : "Finishing up…";
 
   const progressHint =
-    uploadProgress?.phase === "processing" && isCdrUpload
-      ? "Cloud conversion can take up to 2 minutes. Please keep this tab open."
+    uploadProgress?.phase === "processing" && isPdfUpload
+      ? "Rendering page 1 at CR-80 size (1011×638 px). Please keep this tab open."
       : uploadProgress?.phase === "uploading"
         ? "Sending your file to the server."
         : "Almost done.";
@@ -221,61 +193,19 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
-                ID card template (CDR, PDF, PNG, JPG)
+                ID card template (PDF recommended)
               </label>
               <input
                 className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
                 type="file"
-                accept=".cdr,.pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf"
-                onChange={(e) => {
-                  const next = e.target.files?.[0] ?? null;
-                  setFile(next);
-                  if (!next?.name.toLowerCase().endsWith(".cdr")) setPreviewFile(null);
-                }}
+                accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
               />
+              <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">
+                PDF is converted automatically on the server — no CorelDRAW required. PNG and JPG also work.
+              </p>
             </div>
-            {isCdrUpload ? (
-              <div>
-                {cdrNeedsExportFile ? (
-                  <p className="mb-2 rounded-xl border border-[var(--cinema-screen)]/40 bg-[var(--cinema-screen)]/10 p-3 text-xs text-[var(--angora-goat)]">
-                    <strong>Required on cloud:</strong> Vercel cannot run CorelDRAW/Inkscape. Export your design from
-                    CorelDRAW as PNG (1011×638 px) or PDF and attach it below. Your .cdr is still stored as the master
-                    file. Or add <code className="text-[var(--orchid-hush)]">CLOUDCONVERT_API_KEY</code> in Vercel env vars
-                    for automatic conversion.
-                  </p>
-                ) : (
-                  <p className="mb-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
-                    <strong className="text-[var(--angora-goat)]">CDR auto-conversion:</strong> we try CloudConvert
-                    (Vercel), CorelDRAW (Windows), or Inkscape. Conversion may take up to 2 minutes.
-                    {cdrCaps?.cloudConvert ? " CloudConvert ready." : null}
-                    {cdrCaps?.inkscapeFound ? " Inkscape detected." : null}
-                    {cdrCaps?.convertApi && !cdrCaps.cloudConvert ? (
-                      <span className="mt-1 block text-warning">
-                        CONVERTAPI_SECRET does not support CDR — use CLOUDCONVERT_API_KEY on Vercel.
-                      </span>
-                    ) : null}
-                  </p>
-                )}
-                <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
-                  {cdrNeedsExportFile
-                    ? "Print-ready PNG or PDF export from CorelDRAW (required)"
-                    : "Optional fallback — PNG or PDF export (if auto-conversion fails)"}
-                </label>
-                <input
-                  className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf"
-                  onChange={(e) => setPreviewFile(e.target.files?.[0] ?? null)}
-                  required={cdrNeedsExportFile}
-                />
-                {cdrNeedsExportFile ? (
-                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                    In CorelDRAW: File → Export → PNG, or File → Publish to PDF.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
             <div>
               <label className="mb-1.5 flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
                 <PenLine className="h-4 w-4" />
@@ -289,10 +219,11 @@ export default function TemplatesPage() {
               />
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
-              <p className="mb-2 font-medium text-[var(--angora-goat)]">CorelDRAW / industry formats</p>
+              <p className="mb-2 font-medium text-[var(--angora-goat)]">Exporting from CorelDRAW</p>
               <ul className="space-y-1">
-                <li>• <strong>.cdr</strong> — auto-converted to PNG (CloudConvert on Vercel, Inkscape/CorelDRAW locally).</li>
-                <li>• <strong>.pdf / .png / .jpg</strong> — single-file upload works directly.</li>
+                <li>• Set page size to <strong>85.6×53.98 mm</strong> (CR-80 card).</li>
+                <li>• File → Publish to PDF → <strong>300 DPI</strong>, or Export → PDF.</li>
+                <li>• Upload the <strong>.pdf</strong> here — the portal renders it at 1011×638 px for printing.</li>
                 <li>• Principal signature is uploaded separately and stays the same on every card.</li>
                 <li>• Per student: photo, name, enroll ID, class/section, phone, address are filled automatically.</li>
               </ul>
@@ -333,14 +264,15 @@ export default function TemplatesPage() {
                         )}
                       </div>
                     </div>
-                    {isSuperAdmin ? (
+                    {isAdmin ? (
                       <button
                         type="button"
                         onClick={() => removeTemplate(t.id, t.name)}
-                        className="btn-ghost rounded-lg p-2 text-[var(--danger)]"
+                        className="btn-ghost flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-[var(--danger)]"
                         title="Delete template"
                       >
                         <Trash2 className="h-4 w-4" />
+                        Delete
                       </button>
                     ) : null}
                   </div>

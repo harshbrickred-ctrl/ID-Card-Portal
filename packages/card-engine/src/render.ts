@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
+import { fitTemplateRaster } from "./raster";
 import { DEFAULT_TEMPLATE_LAYOUT, type TemplateFieldKey, type TemplateLayout } from "./layout";
 import type { RenderStudentCardInput } from "./types";
 
@@ -90,10 +91,7 @@ async function defaultTemplate(accent: string, schoolName: string): Promise<Buff
 }
 
 async function prepareTemplateBackground(templateBuffer: Buffer): Promise<Buffer> {
-  return sharp(templateBuffer)
-    .resize(CARD_WIDTH, CARD_HEIGHT, { fit: "contain", background: "#ffffff" })
-    .png()
-    .toBuffer();
+  return fitTemplateRaster(templateBuffer);
 }
 
 export function validateStudentCard(student: RenderStudentCardInput["student"]): string[] {

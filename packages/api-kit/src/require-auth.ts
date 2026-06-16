@@ -59,3 +59,9 @@ export function requireSuperAdmin(user: PortalTokenPayload) {
     throw new ForbiddenError("Only Super Admin can delete records");
   }
 }
+
+export function requireAdmin(user: PortalTokenPayload) {
+  if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
+    throw new ForbiddenError("Admin access required");
+  }
+}

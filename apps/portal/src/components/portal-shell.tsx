@@ -88,7 +88,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             <p className="truncate text-xs text-[var(--cinema-screen)]">{user?.email}</p>
             <p className="mt-1 text-xs text-[var(--endless-slumber)]">
               {isSuperAdmin() ? "Super Admin" : "Admin"} ·{" "}
-              {isSuperAdmin() ? "Full access" : "No delete"}
+              {isSuperAdmin() ? "Full access" : "Can manage templates"}
             </p>
             <button
               type="button"
