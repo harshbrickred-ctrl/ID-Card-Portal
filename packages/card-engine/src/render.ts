@@ -2,7 +2,7 @@ import QRCode from "qrcode";
 import sharp from "sharp";
 import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
 import { fitTemplateRaster } from "./raster";
-import { DEFAULT_TEMPLATE_LAYOUT, type TemplateFieldKey, type TemplateLayout } from "./layout";
+import { DEFAULT_TEMPLATE_LAYOUT, DEFAULT_FIELD_LABELS, type TemplateFieldKey, type TemplateLayout } from "./layout";
 import type { RenderStudentCardInput } from "./types";
 
 function esc(s: string): string {
@@ -27,37 +27,118 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines;
 }
 
-function fieldValue(key: TemplateFieldKey, student: RenderStudentCardInput["student"]): string {
+function fieldValue(
+  key: TemplateFieldKey,
+  student: RenderStudentCardInput["student"],
+  school: RenderStudentCardInput["school"],
+  options?: { labeled?: boolean },
+): string {
+  const labeled = options?.labeled ?? false;
   switch (key) {
     case "name":
       return student.name;
+    case "firstName":
+      return student.firstName?.trim() || student.name.split(/\s+/)[0] || student.name;
+    case "lastName": {
+      const parts = student.lastName?.trim()
+        ? [student.lastName.trim()]
+        : student.name.trim().split(/\s+/).slice(1);
+      return parts.join(" ") || "—";
+    }
     case "enrollId":
       return student.enrollId;
     case "classSection":
-      return `Class ${student.class} - ${student.section}`;
+      return labeled
+        ? `${student.class} - ${student.section}`
+        : `Class ${student.class} - ${student.section}`;
+    case "dob":
+      return student.dob?.trim() || "—";
     case "phone":
       return student.phoneNumber?.trim() || "—";
     case "address":
       return student.address?.trim() || "—";
+    case "academicYear":
+      return school.academicYear?.trim() || "—";
   }
+}
+
+function textEl(
+  x: number,
+  y: number,
+  text: string,
+  opts: {
+    fontSize: number;
+    bold?: boolean;
+    fill?: string;
+    anchor?: string;
+    baseline?: string;
+    middleOffset?: number;
+    lineIndex?: number;
+    lineHeight?: number;
+  },
+): string {
+  const weight = opts.bold ? "700" : "400";
+  const fill = opts.fill ?? "#0f172a";
+  const anchor = opts.anchor ?? "start";
+  const baseline = opts.baseline ?? "auto";
+  const lineHeight = opts.lineHeight ?? Math.round(opts.fontSize * 1.35);
+  const lineIndex = opts.lineIndex ?? 0;
+  const yPos = y + (opts.middleOffset ?? 0) + lineIndex * lineHeight;
+  return `<text x="${x}" y="${yPos}" font-family="Arial, Helvetica, sans-serif" font-size="${opts.fontSize}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}" dominant-baseline="${baseline === "middle" ? "middle" : "auto"}">${esc(text)}</text>`;
 }
 
 function renderFieldSvg(
   field: TemplateLayout["fields"][number],
   student: RenderStudentCardInput["student"],
+  school: RenderStudentCardInput["school"],
 ): string {
-  const value = fieldValue(field.key, student);
+  const labeled = Boolean(field.showLabel);
+  const value = fieldValue(field.key, student, school, { labeled });
   const maxChars = field.maxWidth ? Math.floor(field.maxWidth / (field.fontSize * 0.55)) : 60;
   const lines = field.key === "address" ? wrapText(value, maxChars) : [value];
   const lineHeight = field.lineHeight ?? Math.round(field.fontSize * 1.35);
-  const weight = field.bold ? "700" : "400";
+  const anchor = field.textAnchor ?? "start";
+  const baseline = field.dominantBaseline ?? "auto";
+  const middleOffset =
+    baseline === "middle" && lines.length > 1
+      ? -Math.round(((lines.length - 1) * lineHeight) / 2)
+      : 0;
 
-  return lines
-    .map(
-      (line, i) =>
-        `<text x="${field.x}" y="${field.y + i * lineHeight}" font-family="Arial, Helvetica, sans-serif" font-size="${field.fontSize}" font-weight="${weight}" fill="#0f172a">${esc(line)}</text>`,
-    )
-    .join("");
+  const parts: string[] = [];
+
+  if (labeled) {
+    const labelText = `${field.label ?? DEFAULT_FIELD_LABELS[field.key]} :`;
+    const labelX = field.labelX ?? field.x;
+    const labelY = field.labelY ?? field.y;
+    const labelSize = field.labelFontSize ?? field.fontSize;
+    parts.push(
+      textEl(labelX, labelY, labelText, {
+        fontSize: labelSize,
+        bold: true,
+        fill: field.labelFill ?? field.fill ?? "#334155",
+        anchor,
+        baseline,
+        middleOffset,
+      }),
+    );
+  }
+
+  for (const [i, line] of lines.entries()) {
+    parts.push(
+      textEl(field.x, field.y, line, {
+        fontSize: field.fontSize,
+        bold: field.bold,
+        fill: field.fill,
+        anchor,
+        baseline,
+        middleOffset,
+        lineIndex: i,
+        lineHeight,
+      }),
+    );
+  }
+
+  return parts.join("");
 }
 
 async function photoRect(buf: Buffer | null | undefined, w: number, h: number): Promise<Buffer | null> {
@@ -117,10 +198,15 @@ export async function renderStudentCard(input: RenderStudentCardInput): Promise<
   const photo = await photoRect(student.photoBuffer, layout.photo.width, layout.photo.height);
   const signature = await signatureRect(signatureBuffer, layout.signature.width, layout.signature.height);
 
+  const photoFrame =
+    layout.photoBorder !== false
+      ? `<rect x="${layout.photo.x - 4}" y="${layout.photo.y - 4}" width="${layout.photo.width + 8}" height="${layout.photo.height + 8}" rx="12" fill="none" stroke="${accent}" stroke-width="2"/>`
+      : "";
+
   const textSvg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${CARD_WIDTH}" height="${CARD_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  ${layout.fields.map((field) => renderFieldSvg(field, student)).join("")}
-  <rect x="${layout.photo.x - 4}" y="${layout.photo.y - 4}" width="${layout.photo.width + 8}" height="${layout.photo.height + 8}" rx="12" fill="none" stroke="${accent}" stroke-width="2"/>
+  ${layout.fields.map((field) => renderFieldSvg(field, student, school)).join("")}
+  ${photoFrame}
 </svg>`;
 
   const composites: sharp.OverlayOptions[] = [{ input: Buffer.from(textSvg), top: 0, left: 0 }];
@@ -177,9 +263,15 @@ export async function buildStudentPrintZip(
   const { PassThrough } = await import("stream");
   const chunks: Buffer[] = [];
   const stream = new PassThrough();
-  stream.on("data", (c: Buffer) => chunks.push(c));
+
+  const zipReady = new Promise<void>((resolve, reject) => {
+    stream.on("data", (c: Buffer) => chunks.push(c));
+    stream.on("end", resolve);
+    stream.on("error", reject);
+  });
 
   const archive = archiver("zip", { zlib: { level: 6 } });
+  archive.on("error", (err) => stream.destroy(err));
   archive.pipe(stream);
 
   for (const e of entries) {
@@ -192,10 +284,7 @@ export async function buildStudentPrintZip(
   archive.append(manifest, { name: "manifest.csv" });
 
   await archive.finalize();
-  await new Promise<void>((resolve, reject) => {
-    stream.on("end", resolve);
-    stream.on("error", reject);
-  });
+  await zipReady;
 
   return Buffer.concat(chunks);
 }

@@ -26,6 +26,7 @@ type PreviewItem = {
 type PreviewResult = {
   school: School;
   hasTemplate: boolean;
+  hasLayout?: boolean;
   previews: PreviewItem[];
   canPrint: boolean;
 };
@@ -99,13 +100,36 @@ export default function PrintPage() {
     }
   }
 
+  async function printAllFiltered() {
+    if (students.length === 0) return;
+    setLoading(true);
+    try {
+      const hasFilters = Object.values(filters).some(Boolean);
+      const body = hasFilters
+        ? { schoolId, filters }
+        : { schoolId, studentIds: students.map((s) => s.id) };
+      const result = await apiFetch<PreviewResult>("/v1/print/preview", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setPreview(result);
+      setSelected(new Set(result.previews.map((p) => p.studentId)));
+      setStep("preview");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Preview failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function printCards() {
     if (!preview?.canPrint) return;
+    const studentIds = preview.previews.map((p) => p.studentId);
     setPrinting(true);
     try {
       await apiPostZip(
         "/v1/print/execute",
-        { schoolId, studentIds: [...selected] },
+        { schoolId, studentIds },
         `id-cards-${selectedSchool?.code ?? "school"}.zip`,
       );
       setStep("select");
@@ -143,7 +167,9 @@ export default function PrintPage() {
           <p className="text-sm text-[var(--muted-foreground)]">
             {preview?.hasTemplate === false && step === "preview"
               ? "No custom template — using default card layout."
-              : "School template + principal signature are applied to every card. Student name, enroll ID, class, phone, address, and photo change per student."}
+              : preview?.hasLayout === false && step === "preview"
+                ? "Warning: template has no field layout — text may misalign on custom artwork."
+                : "School template + layout + signature are applied to every card."}
           </p>
         </div>
       </GlassCard>
@@ -160,20 +186,31 @@ export default function PrintPage() {
           </GlassCard>
 
           <GlassCard className="mb-6 overflow-x-auto">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={selected.size === students.length && students.length > 0} onChange={toggleAll} />
                 Select all ({selected.size} selected)
               </label>
-              <button
-                type="button"
-                disabled={selected.size === 0 || loading}
-                onClick={generatePreview}
-                className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
-              >
-                <Eye className="h-4 w-4" />
-                {loading ? "Generating…" : "Preview ID Card Forms"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={students.length === 0 || loading}
+                  onClick={printAllFiltered}
+                  className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
+                >
+                  <Printer className="h-4 w-4" />
+                  Preview all ({students.length})
+                </button>
+                <button
+                  type="button"
+                  disabled={selected.size === 0 || loading}
+                  onClick={generatePreview}
+                  className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
+                >
+                  <Eye className="h-4 w-4" />
+                  {loading ? "Generating…" : "Preview selected"}
+                </button>
+              </div>
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -225,10 +262,15 @@ export default function PrintPage() {
               className="btn-primary flex items-center gap-2 rounded-xl px-5 py-2.5"
             >
               <Printer className="h-4 w-4" />
-              {printing ? "Preparing…" : `Print ${preview.previews.length} Cards`}
+              {printing ? "Building ZIP…" : `Print ${preview.previews.length} Cards`}
               <Download className="h-4 w-4" />
             </button>
           </div>
+          {printing ? (
+            <p className="mb-4 text-sm text-[var(--muted-foreground)]">
+              Rendering front + back for each card and packaging the download. This usually takes a few seconds per card.
+            </p>
+          ) : null}
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {preview.previews.map((p) => (

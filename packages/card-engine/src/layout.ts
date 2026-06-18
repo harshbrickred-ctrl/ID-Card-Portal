@@ -1,5 +1,16 @@
+import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
+
 /** Default overlay positions for CR-80 cards (1011×638 px at 300 DPI). */
-export type TemplateFieldKey = "name" | "enrollId" | "classSection" | "phone" | "address";
+export type TemplateFieldKey =
+  | "name"
+  | "firstName"
+  | "lastName"
+  | "enrollId"
+  | "classSection"
+  | "dob"
+  | "phone"
+  | "address"
+  | "academicYear";
 
 export type TemplateFieldLayout = {
   key: TemplateFieldKey;
@@ -9,22 +20,142 @@ export type TemplateFieldLayout = {
   bold?: boolean;
   maxWidth?: number;
   lineHeight?: number;
+  fill?: string;
+  /** Vertical anchor — use "middle" with y set to the row centre on the template. */
+  dominantBaseline?: "auto" | "middle";
+  textAnchor?: "start" | "middle" | "end";
+  showLabel?: boolean;
+  label?: string;
+  labelX?: number;
+  labelY?: number;
+  labelFontSize?: number;
+  labelFill?: string;
+};
+
+export const DEFAULT_FIELD_LABELS: Record<TemplateFieldKey, string> = {
+  name: "Name",
+  firstName: "First Name",
+  lastName: "Last Name",
+  enrollId: "Enroll ID",
+  classSection: "Class",
+  dob: "DOB",
+  phone: "Phone",
+  address: "Address",
+  academicYear: "Session",
 };
 
 export type TemplateLayout = {
   photo: { x: number; y: number; width: number; height: number };
   fields: TemplateFieldLayout[];
   signature: { x: number; y: number; width: number; height: number };
+  /** When false, skip the decorative photo frame drawn by the renderer. */
+  photoBorder?: boolean;
+  /** Layout coords are in this design size; scaled to CR-80 at render time. */
+  sourceWidth?: number;
+  sourceHeight?: number;
 };
 
+function scaleNum(value: number, ratio: number) {
+  return Math.round(value * ratio);
+}
+
+/** Map a layout authored at sourceWidth×sourceHeight onto the CR-80 canvas. */
+export function scaleTemplateLayout(layout: TemplateLayout): TemplateLayout {
+  if (!layout.sourceWidth || !layout.sourceHeight) return layout;
+
+  const sx = CARD_WIDTH / layout.sourceWidth;
+  const sy = CARD_HEIGHT / layout.sourceHeight;
+
+  return {
+    photoBorder: layout.photoBorder,
+    photo: {
+      x: scaleNum(layout.photo.x, sx),
+      y: scaleNum(layout.photo.y, sy),
+      width: scaleNum(layout.photo.width, sx),
+      height: scaleNum(layout.photo.height, sy),
+    },
+    signature: {
+      x: scaleNum(layout.signature.x, sx),
+      y: scaleNum(layout.signature.y, sy),
+      width: scaleNum(layout.signature.width, sx),
+      height: scaleNum(layout.signature.height, sy),
+    },
+    fields: layout.fields.map((field) => ({
+      ...field,
+      x: scaleNum(field.x, sx),
+      y: scaleNum(field.y, sy),
+      fontSize: scaleNum(field.fontSize, Math.min(sx, sy)),
+      maxWidth: field.maxWidth ? scaleNum(field.maxWidth, sx) : undefined,
+      lineHeight: field.lineHeight ? scaleNum(field.lineHeight, sy) : undefined,
+      labelX: field.labelX != null ? scaleNum(field.labelX, sx) : undefined,
+      labelY: field.labelY != null ? scaleNum(field.labelY, sy) : undefined,
+      labelFontSize: field.labelFontSize
+        ? scaleNum(field.labelFontSize, Math.min(sx, sy))
+        : undefined,
+    })),
+  };
+}
+
 export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
+  photoBorder: true,
   photo: { x: 50, y: 150, width: 200, height: 250 },
   fields: [
-    { key: "name", x: 280, y: 180, fontSize: 32, bold: true, maxWidth: 700 },
-    { key: "enrollId", x: 280, y: 235, fontSize: 22, maxWidth: 700 },
-    { key: "classSection", x: 280, y: 280, fontSize: 20, maxWidth: 700 },
-    { key: "phone", x: 280, y: 325, fontSize: 18, maxWidth: 700 },
-    { key: "address", x: 280, y: 365, fontSize: 16, maxWidth: 700, lineHeight: 22 },
+    {
+      key: "name",
+      x: 380,
+      y: 180,
+      fontSize: 32,
+      bold: true,
+      maxWidth: 600,
+      showLabel: true,
+      labelX: 280,
+    },
+    {
+      key: "enrollId",
+      x: 380,
+      y: 235,
+      fontSize: 22,
+      maxWidth: 600,
+      showLabel: true,
+      labelX: 280,
+    },
+    {
+      key: "classSection",
+      x: 380,
+      y: 280,
+      fontSize: 20,
+      maxWidth: 600,
+      showLabel: true,
+      labelX: 280,
+    },
+    {
+      key: "dob",
+      x: 380,
+      y: 325,
+      fontSize: 20,
+      maxWidth: 600,
+      showLabel: true,
+      labelX: 280,
+    },
+    {
+      key: "phone",
+      x: 380,
+      y: 370,
+      fontSize: 18,
+      maxWidth: 600,
+      showLabel: true,
+      labelX: 280,
+    },
+    {
+      key: "address",
+      x: 380,
+      y: 410,
+      fontSize: 16,
+      maxWidth: 600,
+      lineHeight: 22,
+      showLabel: true,
+      labelX: 280,
+    },
   ],
   signature: { x: 700, y: 520, width: 240, height: 90 },
 };

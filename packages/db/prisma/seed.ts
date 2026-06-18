@@ -43,6 +43,7 @@ async function main() {
       code: "GVPS",
       address: "12 Park Avenue, Mumbai",
       accentColor: "#B2ABB2",
+      academicYear: "2025-26",
       students: {
         create: [
           {
@@ -89,6 +90,7 @@ async function main() {
       code: "SIS",
       address: "45 Lake Road, Pune",
       accentColor: "#CCC3D0",
+      academicYear: "2025-26",
       students: {
         create: [
           {

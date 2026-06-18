@@ -36,7 +36,9 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [filters, setFilters] = useState({ enrollId: "", name: "", class: "", section: "" });
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [photoZipFile, setPhotoZipFile] = useState<File | null>(null);
   const [importMsg, setImportMsg] = useState("");
+  const [photoZipMsg, setPhotoZipMsg] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyStudent);
   const [showAdd, setShowAdd] = useState(false);
@@ -98,6 +100,26 @@ export default function StudentsPage() {
       await loadStudents();
     } catch (err) {
       setImportMsg(err instanceof Error ? err.message : "Import failed");
+    }
+  }
+
+  async function importPhotoZip(e: React.FormEvent) {
+    e.preventDefault();
+    if (!photoZipFile || !schoolId) return;
+    setPhotoZipMsg("");
+    const fd = new FormData();
+    fd.append("schoolId", schoolId);
+    fd.append("file", photoZipFile);
+    try {
+      const result = await apiFetch<{ imported: number; skipped: { file: string; reason: string }[] }>(
+        "/v1/students/photos/bulk",
+        { method: "POST", body: fd },
+      );
+      setPhotoZipMsg(`Matched ${result.imported} photos. Skipped ${result.skipped.length} files.`);
+      setPhotoZipFile(null);
+      await loadStudents();
+    } catch (err) {
+      setPhotoZipMsg(err instanceof Error ? err.message : "Photo import failed");
     }
   }
 
@@ -240,7 +262,26 @@ export default function StudentsPage() {
         </form>
         {importMsg ? <p className="mt-2 text-sm text-success">{importMsg}</p> : null}
         <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-          Excel columns: Name, Enroll ID, Class, Section, DOB, Phone Number, Address
+          Excel columns: First Name, Last Name (or Name), Enroll ID, Class, Section, DOB, Phone, Address
+        </p>
+        <form onSubmit={importPhotoZip} className="mt-4 flex flex-wrap items-end gap-3 border-t border-white/10 pt-4">
+          <div className="flex-1">
+            <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">Bulk photo import (ZIP)</label>
+            <input
+              className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(e) => setPhotoZipFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          <button type="submit" disabled={!photoZipFile} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5">
+            <Upload className="h-4 w-4" />
+            Import photos
+          </button>
+        </form>
+        {photoZipMsg ? <p className="mt-2 text-sm text-success">{photoZipMsg}</p> : null}
+        <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+          ZIP files named <code>{`{enrollId}.jpg`}</code> or <code>.png</code> (e.g. DEMO-2026-001.jpg)
         </p>
       </GlassCard>
 

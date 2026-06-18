@@ -1,0 +1,100 @@
+{
+  "sourceWidth": 1576,
+  "sourceHeight": 998,
+  "photoBorder": false,
+  "photo": { "x": 95, "y": 248, "width": 295, "height": 365 },
+  "signature": { "x": 1180, "y": 900, "width": 320, "height": 80 },
+  "fields": [
+    {
+      "key": "name",
+      "x": 835,
+      "y": 308,
+      "fontSize": 32,
+      "bold": true,
+      "maxWidth": 680,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "Name",
+      "labelX": 620,
+      "labelY": 308
+    },
+    {
+      "key": "enrollId",
+      "x": 835,
+      "y": 408,
+      "fontSize": 26,
+      "maxWidth": 680,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "Enroll ID",
+      "labelX": 620,
+      "labelY": 408
+    },
+    {
+      "key": "classSection",
+      "x": 835,
+      "y": 512,
+      "fontSize": 26,
+      "maxWidth": 680,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "Class",
+      "labelX": 620,
+      "labelY": 512
+    },
+    {
+      "key": "dob",
+      "x": 835,
+      "y": 598,
+      "fontSize": 26,
+      "maxWidth": 680,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "DOB",
+      "labelX": 620,
+      "labelY": 598
+    },
+    {
+      "key": "phone",
+      "x": 835,
+      "y": 688,
+      "fontSize": 26,
+      "maxWidth": 680,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "Phone",
+      "labelX": 620,
+      "labelY": 688
+    },
+    {
+      "key": "address",
+      "x": 835,
+      "y": 778,
+      "fontSize": 22,
+      "maxWidth": 680,
+      "lineHeight": 28,
+      "fill": "#1a2e4a",
+      "dominantBaseline": "middle",
+      "showLabel": true,
+      "label": "Address",
+      "labelX": 620,
+      "labelY": 778
+    },
+    {
+      "key": "academicYear",
+      "x": 268,
+      "y": 900,
+      "fontSize": 24,
+      "bold": true,
+      "maxWidth": 140,
+      "fill": "#ffffff",
+      "dominantBaseline": "middle",
+      "textAnchor": "middle"
+    }
+  ]
+}

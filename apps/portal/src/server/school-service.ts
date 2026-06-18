@@ -23,6 +23,7 @@ export async function createSchool(dto: SchoolDto) {
       code,
       address: dto.address,
       accentColor: dto.accentColor ?? "#CCC3D0",
+      academicYear: dto.academicYear,
     },
   });
 }

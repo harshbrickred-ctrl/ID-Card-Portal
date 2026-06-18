@@ -64,7 +64,7 @@ function normalizeHeader(h: string) {
   return h.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-const HEADER_MAP: Record<string, keyof StudentDto> = {
+const HEADER_MAP: Record<string, keyof StudentDto | "firstName" | "lastName"> = {
   enrollid: "enrollId",
   enrollmentid: "enrollId",
   enrollmentno: "enrollId",
@@ -73,6 +73,8 @@ const HEADER_MAP: Record<string, keyof StudentDto> = {
   id: "enrollId",
   name: "name",
   studentname: "name",
+  firstname: "firstName",
+  lastname: "lastName",
   classname: "class",
   class: "class",
   std: "class",
@@ -111,7 +113,7 @@ export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buff
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const mapped: Partial<StudentDto> = { schoolId };
+    const mapped: Partial<StudentDto> & { firstName?: string; lastName?: string } = { schoolId };
 
     for (const [key, val] of Object.entries(row)) {
       const field = HEADER_MAP[normalizeHeader(key)];
@@ -120,17 +122,40 @@ export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buff
       }
     }
 
+    if (!mapped.name && (mapped.firstName || mapped.lastName)) {
+      mapped.name = [mapped.firstName, mapped.lastName].filter(Boolean).join(" ");
+    }
+
     if (!mapped.enrollId || !mapped.name || !mapped.class || !mapped.section) {
-      skipped.push({ row: i + 2, reason: "Missing required fields (enrollId, name, class, section)" });
+      skipped.push({
+        row: i + 2,
+        reason: "Missing required fields (enrollId, name or first+last, class, section)",
+      });
       continue;
     }
 
     try {
       await prisma.student.upsert({
         where: { schoolId_enrollId: { schoolId, enrollId: mapped.enrollId } },
-        create: mapped as StudentDto,
+        create: {
+          schoolId,
+          enrollId: mapped.enrollId,
+          name: mapped.name,
+          firstName: mapped.firstName,
+          lastName: mapped.lastName,
+          class: mapped.class,
+          section: mapped.section,
+          fatherName: mapped.fatherName,
+          motherName: mapped.motherName,
+          dob: mapped.dob,
+          phoneNumber: mapped.phoneNumber,
+          bloodGroup: mapped.bloodGroup,
+          address: mapped.address,
+        },
         update: {
           name: mapped.name,
+          firstName: mapped.firstName,
+          lastName: mapped.lastName,
           class: mapped.class,
           section: mapped.section,
           fatherName: mapped.fatherName,
@@ -166,4 +191,59 @@ export async function saveStudentPhoto(studentId: string, buffer: Buffer, ext: s
 export async function loadStudentPhotoBuffer(photoUrl: string | null | undefined) {
   if (!photoUrl) return null;
   return readStorageFile(photoUrl);
+}
+
+const PHOTO_EXT = new Set(["jpg", "jpeg", "png", "webp"]);
+
+function enrollIdFromPhotoFilename(filename: string): string | null {
+  const base = filename.split(/[/\\]/).pop() ?? "";
+  const match = base.match(/^(.+)\.(jpg|jpeg|png|webp)$/i);
+  if (!match) return null;
+  return match[1];
+}
+
+export async function importPhotosFromZip(schoolId: string, zipBuffer: Buffer) {
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  if (!school) throw new NotFoundError("School not found");
+
+  const { unzipSync } = await import("fflate");
+  const entries = unzipSync(new Uint8Array(zipBuffer));
+
+  const imported: string[] = [];
+  const skipped: { file: string; reason: string }[] = [];
+  let total = 0;
+
+  for (const [entryPath, data] of Object.entries(entries)) {
+    if (entryPath.endsWith("/")) continue;
+    total += 1;
+
+    const enrollId = enrollIdFromPhotoFilename(entryPath);
+    if (!enrollId) {
+      skipped.push({ file: entryPath, reason: "Filename must be {enrollId}.jpg/png" });
+      continue;
+    }
+
+    const ext = entryPath.split(".").pop()?.toLowerCase() ?? "";
+    if (!PHOTO_EXT.has(ext)) {
+      skipped.push({ file: entryPath, reason: "Unsupported image type" });
+      continue;
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { schoolId_enrollId: { schoolId, enrollId } },
+    });
+    if (!student) {
+      skipped.push({ file: entryPath, reason: `No student with enrollId ${enrollId}` });
+      continue;
+    }
+
+    await saveStudentPhoto(student.id, Buffer.from(data), ext === "jpeg" ? "jpg" : ext);
+    imported.push(enrollId);
+  }
+
+  return { imported: imported.length, skipped, total };
+}
+
+export async function listStudentIdsForSchool(schoolId: string, filters?: StudentFilters) {
+  return listStudents(filters ?? { schoolId });
 }

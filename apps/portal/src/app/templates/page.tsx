@@ -14,6 +14,7 @@ type Template = {
   sourceUrl: string | null;
   sourceFormat: string | null;
   signatureUrl: string | null;
+  hasLayout?: boolean;
   school: School;
   updatedAt: string;
 };
@@ -26,6 +27,7 @@ export default function TemplatesPage() {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [signature, setSignature] = useState<File | null>(null);
+  const [layoutFile, setLayoutFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     phase: UploadProgressPhase;
@@ -90,13 +92,19 @@ export default function TemplatesPage() {
       fd.append("name", name || "School ID Template");
       fd.append("file", file);
       if (signature) fd.append("signature", signature);
-      await apiUploadFormData("/v1/templates", fd, (phase, percent) => {
+      if (layoutFile) fd.append("layout", layoutFile);
+      const result = await apiUploadFormData<{ layoutWarning?: string | null }>("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
       });
       setMessageType("success");
-      setMessage("Template uploaded. Preview is ready — you can now generate ID cards for all students.");
+      setMessage(
+        result.layoutWarning
+          ? `Template uploaded. Warning: ${result.layoutWarning}`
+          : "Template and field layout uploaded. Cards will align to your design.",
+      );
       setFile(null);
       setSignature(null);
+      setLayoutFile(null);
       setName("");
       await load();
     } catch (err) {
@@ -207,6 +215,20 @@ export default function TemplatesPage() {
               </p>
             </div>
             <div>
+              <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
+                Field layout JSON (recommended for custom designs)
+              </label>
+              <input
+                className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => setLayoutFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">
+                Upload <code className="text-[var(--angora-goat)]">sample-template.layout.json</code> so name, ID, and address align with your artwork.
+              </p>
+            </div>
+            <div>
               <label className="mb-1.5 flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
                 <PenLine className="h-4 w-4" />
                 Principal signature (PNG/JPG, optional)
@@ -257,10 +279,15 @@ export default function TemplatesPage() {
                         {t.sourceFormat ? (
                           <span className="text-xs text-[var(--muted-foreground)]">Source: {t.sourceFormat.toUpperCase()}</span>
                         ) : null}
+                        {t.hasLayout ? (
+                          <span className="text-xs text-success">Field layout configured</span>
+                        ) : (
+                          <span className="text-xs text-warning">No field layout — may misalign</span>
+                        )}
                         {t.signatureUrl ? (
                           <span className="text-xs text-success">Signature attached</span>
                         ) : (
-                          <span className="text-xs text-warning">No signature</span>
+                          <span className="text-xs text-[var(--muted-foreground)]">No signature</span>
                         )}
                       </div>
                     </div>

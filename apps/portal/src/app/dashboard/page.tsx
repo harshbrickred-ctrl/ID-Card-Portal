@@ -36,11 +36,12 @@ export default function DashboardPage() {
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
   const [data, setData] = useState<DashboardData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState<{ name: string; code: string; address: string; accentColor: string }>({
+  const [form, setForm] = useState<{ name: string; code: string; address: string; accentColor: string; academicYear: string }>({
     name: "",
     code: "",
     address: "",
     accentColor: palette.orchidHush,
+    academicYear: "2025-26",
   });
   const [error, setError] = useState("");
 
@@ -69,7 +70,7 @@ export default function DashboardPage() {
     try {
       await apiFetch("/v1/schools", { method: "POST", body: JSON.stringify(form) });
       setShowAdd(false);
-      setForm({ name: "", code: "", address: "", accentColor: palette.orchidHush });
+      setForm({ name: "", code: "", address: "", accentColor: palette.orchidHush, academicYear: "2025-26" });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add school");
@@ -193,6 +194,7 @@ export default function DashboardPage() {
               <input className="input-glass" placeholder="School name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               <input className="input-glass" placeholder="Code (e.g. GVPS)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required />
               <input className="input-glass" placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <input className="input-glass" placeholder="Academic year (e.g. 2025-26)" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} />
               <input className="input-glass" type="color" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} />
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="btn-primary flex-1 rounded-xl py-2">Create</button>
