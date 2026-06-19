@@ -1,11 +1,15 @@
 import { createRequire } from "module";
 import path from "path";
+import { fileURLToPath } from "url";
 import type { PdfToPngOptions, PngPageOutput } from "pdf-to-png-converter";
+
+const requireFromThisFile = createRequire(import.meta.url);
 
 function resolvePdfJsRoot(): string {
   const anchors = [
     path.join(process.cwd(), "package.json"),
     path.join(process.cwd(), "../../package.json"),
+    fileURLToPath(import.meta.url),
   ];
 
   for (const anchor of anchors) {
@@ -28,9 +32,7 @@ function resolvePdfJsRoot(): string {
     }
   }
 
-  throw new Error(
-    "pdfjs-dist is not installed. Run npm install in the monorepo root and redeploy.",
-  );
+  return path.dirname(requireFromThisFile.resolve("pdfjs-dist/package.json"));
 }
 
 function pdfjsAssetUrl(pdfjsRoot: string, ...segments: string[]): string {
@@ -39,10 +41,16 @@ function pdfjsAssetUrl(pdfjsRoot: string, ...segments: string[]): string {
 
 let pathsPatched = false;
 
-/** pdfjs 6 requires factory URLs to end with `/` (forward slash). pdf-to-png-converter uses `path.sep` on Windows. */
+/**
+ * pdfjs 6 requires cMapUrl / standardFontDataUrl to end with `/`.
+ * pdf-to-png-converter's normalizePath uses `\` on Windows — patch only there.
+ * Linux (Vercel) already gets forward slashes; no patch or pdfjs path lookup needed.
+ */
 function patchPdfToPngAssetPaths() {
   if (pathsPatched) return;
   pathsPatched = true;
+
+  if (process.platform !== "win32") return;
 
   const portalReq = createRequire(path.join(process.cwd(), "package.json"));
   const converterOutDir = path.dirname(portalReq.resolve("pdf-to-png-converter"));
