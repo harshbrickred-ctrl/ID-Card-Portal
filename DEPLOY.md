@@ -13,7 +13,6 @@ Add these in **Vercel → Project → Settings → Environment Variables** for *
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Neon Postgres **pooled** connection string (`?sslmode=require`) |
-| `JWT_SECRET` | Random string, at least 32 characters |
 | `PORTAL_URL` | Your deployed URL, e.g. `https://your-app.vercel.app` |
 | `NEXT_PUBLIC_PORTAL_URL` | Same as `PORTAL_URL` |
 | `BLOB_STORE_ID` | Vercel Blob store (auto-set when Blob is linked) |

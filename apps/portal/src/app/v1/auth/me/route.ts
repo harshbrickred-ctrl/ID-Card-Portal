@@ -1,5 +1,6 @@
 import { prisma } from "@idportal/db";
-import { requireAuth, withApi } from "@idportal/api-kit";
+import { withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 
 export const GET = withApi(async (req) => {
   const auth = await requireAuth(req);

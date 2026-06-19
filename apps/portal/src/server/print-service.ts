@@ -122,11 +122,16 @@ export async function previewCards(
     academicYear: school.academicYear,
   };
 
+  const layoutReady = !hasTemplate || Boolean(layout);
+
   const previews = await Promise.all(
     students.map(async (s) => {
       const cardStudent = await buildCardData(s);
       const errors = validateStudentCard(cardStudent);
-      const hasErrors = errors.some((e) => BLOCKING_ERRORS.has(e));
+      if (!layoutReady) {
+        errors.push("Field layout not configured — open Templates → Edit layout");
+      }
+      const hasErrors = errors.some((e) => BLOCKING_ERRORS.has(e)) || !layoutReady;
 
       const front = await renderStudentCard({
         student: cardStudent,
@@ -172,7 +177,10 @@ export async function executePrint(
   const { school, students } = await loadPrintBatch(schoolId, studentIds, filters);
   await assertPrintableStudents(students);
 
-  const { templateBuffer, signatureBuffer, layout } = await loadTemplateAssets(schoolId);
+  const { templateBuffer, signatureBuffer, layout, hasTemplate } = await loadTemplateAssets(schoolId);
+  if (hasTemplate && !layout) {
+    throw new BadRequestError("Configure field layout in Templates → Edit layout before printing.");
+  }
 
   const schoolData = {
     name: school.name,

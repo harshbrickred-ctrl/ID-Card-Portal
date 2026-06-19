@@ -159,3 +159,5 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
   ],
   signature: { x: 700, y: 520, width: 240, height: 90 },
 };
+
+export { createDefaultLayoutForSource } from "@idportal/contracts";

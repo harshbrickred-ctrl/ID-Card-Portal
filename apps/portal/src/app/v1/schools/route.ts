@@ -1,4 +1,5 @@
-import { requireAuth, validateBody, withApi } from "@idportal/api-kit";
+import { validateBody, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import { SchoolSchema } from "@idportal/contracts";
 import * as schoolService from "@/server/school-service";
 

@@ -1,43 +1,35 @@
 import { create } from "zustand";
 import type { AuthUser } from "@idportal/contracts";
-import { clearToken, setToken } from "./api/client";
+import { apiFetch } from "./api/client";
 
 type AuthState = {
-  token: string | null;
   user: AuthUser | null;
-  setSession: (data: { token: string; user: AuthUser }) => void;
-  logout: () => void;
+  hydrated: boolean;
+  setSession: (user: AuthUser) => void;
+  logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   isSuperAdmin: () => boolean;
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: null,
   user: null,
-  setSession: (data) => {
-    setToken(data.token);
-    set({ token: data.token, user: data.user });
-  },
-  logout: () => {
-    clearToken();
-    set({ token: null, user: null });
+  hydrated: false,
+  setSession: (user) => set({ user, hydrated: true }),
+  logout: async () => {
+    try {
+      await apiFetch<{ ok: boolean }>("/v1/auth/logout", { method: "POST" });
+    } catch {
+      /* clear local state even if request fails */
+    }
+    set({ user: null, hydrated: true });
   },
   hydrate: async () => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("idportal-token");
-    if (!token) return;
-    set({ token });
     try {
-      const res = await fetch("/v1/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (json.success && json.data?.user) {
-        set({ user: json.data.user });
-      }
+      const data = await apiFetch<{ user: AuthUser } | null>("/v1/auth/me");
+      set({ user: data?.user ?? null, hydrated: true });
     } catch {
-      clearToken();
-      set({ token: null, user: null });
+      set({ user: null, hydrated: true });
     }
   },
   isSuperAdmin: () => get().user?.role === "SUPER_ADMIN",

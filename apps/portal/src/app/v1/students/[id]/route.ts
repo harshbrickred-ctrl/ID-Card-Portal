@@ -1,4 +1,5 @@
-import { requireAuth, requireSuperAdmin, validateBody, withApi } from "@idportal/api-kit";
+import { validateBody, withApi } from "@idportal/api-kit";
+import { requireAuth, requireSuperAdmin } from "@/server/session-auth";
 import { StudentUpdateSchema } from "@idportal/contracts";
 import * as studentService from "@/server/student-service";
 

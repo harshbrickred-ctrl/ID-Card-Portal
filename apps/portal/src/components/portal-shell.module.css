@@ -1,0 +1,226 @@
+.appFrame {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  width: 17.5rem;
+  height: 100vh;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 1.25rem 1rem 1rem;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  padding: 0 0.35rem;
+}
+
+.brandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
+}
+
+.brandTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: #f8fafc;
+}
+
+.brandSub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.navDivider {
+  height: 1px;
+  margin: 0.65rem 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.65rem;
+  padding: 0.625rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  color: #94a3b8;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+
+.navIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.navLink:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+
+.navLinkActive {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+}
+
+.userCard {
+  margin-top: auto;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.85rem;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.userAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #334155, #475569);
+  color: #f8fafc;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.userMeta {
+  min-width: 0;
+}
+
+.userName {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userEmail {
+  font-size: 0.65rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleBadge {
+  display: inline-flex;
+  margin-top: 0.5rem;
+  border-radius: 9999px;
+  background: rgba(13, 148, 136, 0.15);
+  color: #5eead4;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+}
+
+.helpLink {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.helpLink:hover {
+  color: #e2e8f0;
+}
+
+.signOut {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 0.45rem 0;
+  cursor: pointer;
+}
+
+.signOut:hover {
+  color: #f87171;
+}
+
+.contentColumn {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.contentColumnDashboard {
+  background: #f0f4f8;
+}
+
+.main {
+  flex: 1;
+  padding: 2rem 2.5rem;
+}
+
+.mainDashboard {
+  padding: 0;
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 0 0 1.5rem;
+  background: #f0f4f8;
+}
+
+.footerInner {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 2.5vw, 2rem);
+  text-align: center;
+  font-size: 0.75rem;
+  color: #64748b;
+}

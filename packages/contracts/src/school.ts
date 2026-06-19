@@ -8,6 +8,8 @@ export const SchoolSchema = z.object({
   academicYear: z.string().min(4).max(20).optional(),
 });
 
+export const SchoolUpdateSchema = SchoolSchema.partial();
+
 export const StudentSchema = z.object({
   schoolId: z.string().uuid(),
   enrollId: z.string().min(1),
@@ -52,6 +54,7 @@ export const PrintPreviewSchema = z
 export const PrintExecuteSchema = PrintPreviewSchema;
 
 export type SchoolDto = z.infer<typeof SchoolSchema>;
+export type SchoolUpdateDto = z.infer<typeof SchoolUpdateSchema>;
 export type StudentDto = z.infer<typeof StudentSchema>;
 export type StudentUpdateDto = z.infer<typeof StudentUpdateSchema>;
 export type PrintFiltersDto = z.infer<typeof PrintFiltersSchema>;

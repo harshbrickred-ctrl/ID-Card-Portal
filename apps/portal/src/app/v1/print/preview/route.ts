@@ -1,4 +1,5 @@
-import { requireAuth, validateBody, withApi } from "@idportal/api-kit";
+import { validateBody, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import { PrintPreviewSchema } from "@idportal/contracts";
 import * as printService from "@/server/print-service";
 

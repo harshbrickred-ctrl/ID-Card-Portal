@@ -3,6 +3,15 @@ import type { StudentDto, StudentUpdateDto } from "@idportal/contracts";
 import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import * as XLSX from "xlsx";
 import { deleteStorageFile, publicFileUrl, readStorageFile, saveFile } from "./storage";
+import { formatClassSection, parseClassSection } from "@/lib/class-section";
+
+export type ClassSectionSummary = {
+  class: string;
+  section: string;
+  label: string;
+  count: number;
+  withPhoto: number;
+};
 
 export type StudentFilters = {
   schoolId: string;
@@ -28,6 +37,37 @@ export async function listStudents(filters: StudentFilters) {
     ...s,
     photoUrl: s.photoUrl ? publicFileUrl(s.photoUrl) : null,
   }));
+}
+
+export async function getClassSectionSummary(schoolId: string): Promise<ClassSectionSummary[]> {
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  if (!school) throw new NotFoundError("School not found");
+
+  const students = await prisma.student.findMany({
+    where: { schoolId },
+    select: { class: true, section: true, photoUrl: true },
+    orderBy: [{ class: "asc" }, { section: "asc" }],
+  });
+
+  const map = new Map<string, ClassSectionSummary>();
+
+  for (const student of students) {
+    const key = `${student.class}\0${student.section}`;
+    const existing = map.get(key) ?? {
+      class: student.class,
+      section: student.section,
+      label: formatClassSection(student.class, student.section),
+      count: 0,
+      withPhoto: 0,
+    };
+    existing.count += 1;
+    if (student.photoUrl) existing.withPhoto += 1;
+    map.set(key, existing);
+  }
+
+  return [...map.values()].sort(
+    (a, b) => a.class.localeCompare(b.class, undefined, { numeric: true }) || a.section.localeCompare(b.section),
+  );
 }
 
 export async function createStudent(dto: StudentDto) {
@@ -61,25 +101,57 @@ export async function deleteStudent(id: string) {
 }
 
 function normalizeHeader(h: string) {
-  return h.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return h
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
+
+const CLASS_SECTION_HEADERS = new Set([
+  "classsection",
+  "classsec",
+  "classandsection",
+  "gradewithsection",
+  "classsecion",
+  "classwithsection",
+]);
 
 const HEADER_MAP: Record<string, keyof StudentDto | "firstName" | "lastName"> = {
   enrollid: "enrollId",
   enrollmentid: "enrollId",
   enrollmentno: "enrollId",
+  enrollno: "enrollId",
+  admissionno: "enrollId",
+  admissionnumber: "enrollId",
+  admission: "enrollId",
+  regno: "enrollId",
+  registrationno: "enrollId",
+  grno: "enrollId",
+  scholarid: "enrollId",
+  scholarno: "enrollId",
   rollno: "enrollId",
   rollnumber: "enrollId",
+  studentid: "enrollId",
   id: "enrollId",
   name: "name",
   studentname: "name",
+  pupilsname: "name",
+  fullname: "name",
   firstname: "firstName",
+  fname: "firstName",
   lastname: "lastName",
+  lname: "lastName",
+  surname: "lastName",
   classname: "class",
   class: "class",
   std: "class",
+  standard: "class",
+  grade: "class",
   section: "section",
   sec: "section",
+  division: "section",
+  div: "section",
   fathername: "fatherName",
   father: "fatherName",
   mothername: "motherName",
@@ -95,7 +167,110 @@ const HEADER_MAP: Record<string, keyof StudentDto | "firstName" | "lastName"> = 
   mobilenumber: "phoneNumber",
   mobile: "phoneNumber",
   contact: "phoneNumber",
+  contactno: "phoneNumber",
 };
+
+function cellString(val: unknown): string {
+  if (val == null || val === "") return "";
+  if (typeof val === "number") {
+    if (Number.isInteger(val)) return String(val);
+    return String(val);
+  }
+  return String(val).trim();
+}
+
+function headerScore(cells: unknown[]): number {
+  let score = 0;
+  for (const cell of cells) {
+    const norm = normalizeHeader(String(cell));
+    if (!norm) continue;
+    if (HEADER_MAP[norm] || CLASS_SECTION_HEADERS.has(norm)) score += 1;
+  }
+  return score;
+}
+
+function rowsFromSheet(sheet: XLSX.WorkSheet): {
+  rows: Record<string, unknown>[];
+  headerRowIndex: number;
+} {
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+  if (matrix.length === 0) return { rows: [], headerRowIndex: 0 };
+
+  let headerRowIndex = 0;
+  let bestScore = headerScore(matrix[0] ?? []);
+  for (let i = 1; i < Math.min(15, matrix.length); i++) {
+    const score = headerScore(matrix[i] ?? []);
+    if (score > bestScore) {
+      bestScore = score;
+      headerRowIndex = i;
+    }
+  }
+
+  if (bestScore < 2) {
+    return {
+      rows: XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" }),
+      headerRowIndex: 0,
+    };
+  }
+
+  const headers = (matrix[headerRowIndex] ?? []).map((cell) => String(cell).replace(/^\uFEFF/, "").trim());
+  const rows: Record<string, unknown>[] = [];
+
+  for (let i = headerRowIndex + 1; i < matrix.length; i++) {
+    const line = matrix[i] ?? [];
+    const row: Record<string, unknown> = {};
+    let hasValue = false;
+
+    headers.forEach((header, col) => {
+      if (!header) return;
+      const value = line[col] ?? "";
+      if (value !== "") hasValue = true;
+      row[header] = value;
+    });
+
+    if (hasValue) rows.push(row);
+  }
+
+  return { rows, headerRowIndex };
+}
+
+function mapImportRow(row: Record<string, unknown>, schoolId: string) {
+  const mapped: Partial<StudentDto> & { firstName?: string; lastName?: string } = { schoolId };
+
+  for (const [key, val] of Object.entries(row)) {
+    const norm = normalizeHeader(key);
+    if (CLASS_SECTION_HEADERS.has(norm)) {
+      const parsed = parseClassSection(cellString(val));
+      if (parsed) {
+        mapped.class = parsed.class;
+        mapped.section = parsed.section;
+      }
+      continue;
+    }
+
+    const field = HEADER_MAP[norm];
+    if (field) {
+      const text = cellString(val);
+      if (text !== "") {
+        (mapped as Record<string, string>)[field] = text;
+      }
+    }
+  }
+
+  if (mapped.class && !mapped.section) {
+    const parsed = parseClassSection(mapped.class);
+    if (parsed) {
+      mapped.class = parsed.class;
+      mapped.section = parsed.section;
+    }
+  }
+
+  if (!mapped.name && (mapped.firstName || mapped.lastName)) {
+    mapped.name = [mapped.firstName, mapped.lastName].filter(Boolean).join(" ");
+  }
+
+  return mapped;
+}
 
 export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buffer) {
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
@@ -105,30 +280,19 @@ export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buff
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) throw new BadRequestError("Excel file has no sheets");
 
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-  if (rows.length === 0) throw new BadRequestError("Excel file is empty");
+  const { rows, headerRowIndex } = rowsFromSheet(sheet);
+  if (rows.length === 0) throw new BadRequestError("Excel file has no student rows");
 
   const imported: string[] = [];
   const skipped: { row: number; reason: string }[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const mapped: Partial<StudentDto> & { firstName?: string; lastName?: string } = { schoolId };
-
-    for (const [key, val] of Object.entries(row)) {
-      const field = HEADER_MAP[normalizeHeader(key)];
-      if (field && val !== "") {
-        (mapped as Record<string, string>)[field] = String(val).trim();
-      }
-    }
-
-    if (!mapped.name && (mapped.firstName || mapped.lastName)) {
-      mapped.name = [mapped.firstName, mapped.lastName].filter(Boolean).join(" ");
-    }
+    const mapped = mapImportRow(rows[i], schoolId);
+    const excelRow = headerRowIndex + i + 2;
 
     if (!mapped.enrollId || !mapped.name || !mapped.class || !mapped.section) {
       skipped.push({
-        row: i + 2,
+        row: excelRow,
         reason: "Missing required fields (enrollId, name or first+last, class, section)",
       });
       continue;
@@ -168,7 +332,7 @@ export async function importStudentsFromExcel(schoolId: string, fileBuffer: Buff
       });
       imported.push(mapped.enrollId);
     } catch {
-      skipped.push({ row: i + 2, reason: "Failed to save row" });
+      skipped.push({ row: excelRow, reason: "Failed to save row" });
     }
   }
 

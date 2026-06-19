@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Upload, FileImage, Trash2, PenLine, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import {
+  FileImage,
+  LayoutTemplate,
+  Loader2,
+  Move,
+  PenLine,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { apiFetch, apiUploadFormData, type UploadProgressPhase } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth-store";
-import { Badge, GlassCard, PageHeader } from "@/components/ui";
+import dash from "@/components/dashboard/dashboard.module.css";
+import styles from "@/components/templates/templates.module.css";
 
 type School = { id: string; name: string; code: string; accentColor: string };
 type Template = {
@@ -20,7 +31,8 @@ type Template = {
 };
 
 export default function TemplatesPage() {
-  const isAdmin = useAuthStore((s) => Boolean(s.user));
+  const router = useRouter();
+  const isLoggedIn = useAuthStore((s) => Boolean(s.user));
   const [schools, setSchools] = useState<School[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [schoolId, setSchoolId] = useState("");
@@ -33,9 +45,10 @@ export default function TemplatesPage() {
     phase: UploadProgressPhase;
     percent: number;
   } | null>(null);
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const isPdfUpload = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
@@ -50,17 +63,23 @@ export default function TemplatesPage() {
 
     if (schoolsResult.status === "fulfilled") {
       setSchools(schoolsResult.value);
-      if (!schoolId && schoolsResult.value[0]) setSchoolId(schoolsResult.value[0].id);
+      setSchoolId((current) => {
+        if (current && schoolsResult.value.some((s) => s.id === current)) return current;
+        const fromUrl =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("schoolId")
+            : null;
+        const match = fromUrl ? schoolsResult.value.find((s) => s.id === fromUrl) : null;
+        return match?.id ?? schoolsResult.value[0]?.id ?? "";
+      });
     } else {
-      error =
-        schoolsResult.reason instanceof Error ? schoolsResult.reason.message : "Failed to load schools";
+      error = schoolsResult.reason instanceof Error ? schoolsResult.reason.message : "Failed to load schools";
     }
 
     if (templatesResult.status === "fulfilled") {
       setTemplates(templatesResult.value);
     } else if (!error) {
-      error =
-        templatesResult.reason instanceof Error ? templatesResult.reason.message : "Failed to load templates";
+      error = templatesResult.reason instanceof Error ? templatesResult.reason.message : "Failed to load templates";
     }
 
     if (error) setLoadError(error);
@@ -70,13 +89,44 @@ export default function TemplatesPage() {
     void load();
   }, []);
 
-  async function removeTemplate(id: string, templateName: string) {
-    if (!confirm(`Delete template "${templateName}"?`)) return;
+  const visibleTemplates = useMemo(
+    () => (schoolId ? templates.filter((t) => t.school.id === schoolId) : templates),
+    [templates, schoolId],
+  );
+
+  const stats = useMemo(
+    () => ({
+      total: visibleTemplates.length,
+      withLayout: visibleTemplates.filter((t) => t.hasLayout).length,
+      withSignature: visibleTemplates.filter((t) => t.signatureUrl).length,
+    }),
+    [visibleTemplates],
+  );
+
+  const selectedSchool = schools.find((s) => s.id === schoolId);
+
+  function onSchoolChange(nextId: string) {
+    setSchoolId(nextId);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (nextId) params.set("schoolId", nextId);
+    else params.delete("schoolId");
+    const qs = params.toString();
+    router.replace(qs ? `/templates?${qs}` : "/templates", { scroll: false });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await apiFetch(`/v1/templates/${id}`, { method: "DELETE" });
+      await apiFetch(`/v1/templates/${deleteTarget.id}`, { method: "DELETE" });
+      setBanner({ type: "success", text: `Template "${deleteTarget.name}" deleted.` });
+      setDeleteTarget(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      setBanner({ type: "error", text: err instanceof Error ? err.message : "Delete failed" });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -85,7 +135,7 @@ export default function TemplatesPage() {
     if (!file || !schoolId) return;
     setLoading(true);
     setUploadProgress({ phase: "uploading", percent: 0 });
-    setMessage("");
+    setBanner(null);
     try {
       const fd = new FormData();
       fd.append("schoolId", schoolId);
@@ -96,20 +146,19 @@ export default function TemplatesPage() {
       const result = await apiUploadFormData<{ layoutWarning?: string | null }>("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
       });
-      setMessageType("success");
-      setMessage(
-        result.layoutWarning
-          ? `Template uploaded. Warning: ${result.layoutWarning}`
-          : "Template and field layout uploaded. Cards will align to your design.",
-      );
+      setBanner({
+        type: result.layoutWarning ? "error" : "success",
+        text: result.layoutWarning
+          ? `Template uploaded with warning: ${result.layoutWarning}`
+          : "Template uploaded. Open Edit layout to align fields on the card.",
+      });
       setFile(null);
       setSignature(null);
       setLayoutFile(null);
       setName("");
       await load();
     } catch (err) {
-      setMessageType("error");
-      setMessage(err instanceof Error ? err.message : "Upload failed");
+      setBanner({ type: "error", text: err instanceof Error ? err.message : "Upload failed" });
     } finally {
       setLoading(false);
       setUploadProgress(null);
@@ -127,39 +176,27 @@ export default function TemplatesPage() {
 
   const progressHint =
     uploadProgress?.phase === "processing" && isPdfUpload
-      ? "Rendering page 1 at CR-80 size (1011×638 px). Please keep this tab open."
+      ? "Rendering page 1 at CR-80 size (1011×638 px). Keep this tab open."
       : uploadProgress?.phase === "uploading"
         ? "Sending your file to the server."
         : "Almost done.";
 
   return (
-    <div>
+    <div className={dash.root}>
       {uploadProgress ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1a1228] p-8 text-center shadow-2xl">
-            <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[var(--orchid-hush)]" />
-            <p className="text-lg font-semibold text-[var(--angora-goat)]">{progressLabel}</p>
-            <p className="mt-2 text-sm text-[var(--muted-foreground)]">{progressHint}</p>
+        <div className={styles.progressBackdrop} role="status" aria-live="polite" aria-busy="true">
+          <div className={styles.progressDialog}>
+            <Loader2 className="mx-auto h-11 w-11 animate-spin text-[#0d9488]" />
+            <p className={styles.progressTitle}>{progressLabel}</p>
+            <p className={styles.progressHint}>{progressHint}</p>
             {uploadProgress.phase === "uploading" ? (
-              <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[var(--orchid-hush)] transition-all duration-300"
-                  style={{ width: `${uploadProgress.percent}%` }}
-                />
+              <div className={styles.progressBar}>
+                <div className={styles.progressFill} style={{ width: `${uploadProgress.percent}%` }} />
               </div>
             ) : (
-              <div className="mt-5 flex justify-center gap-1">
+              <div className={styles.progressDots}>
                 {[0, 1, 2].map((dot) => (
-                  <span
-                    key={dot}
-                    className="h-2 w-2 animate-pulse rounded-full bg-[var(--orchid-hush)]"
-                    style={{ animationDelay: `${dot * 200}ms` }}
-                  />
+                  <span key={dot} className={styles.progressDot} style={{ animationDelay: `${dot * 200}ms` }} />
                 ))}
               </div>
             )}
@@ -167,164 +204,288 @@ export default function TemplatesPage() {
         </div>
       ) : null}
 
-      <PageHeader
-        title="ID Card Templates"
-        description="Upload the school card design once — student data is filled in automatically for every print"
-      />
+      <div className={dash.pageInner}>
+        <header className={dash.header}>
+          <div>
+            <h1 className={dash.headerTitle}>Templates</h1>
+            <p className={dash.headerDesc}>
+              Upload each school&apos;s ID card design once — student data fills in automatically at print time
+            </p>
+          </div>
+        </header>
 
-      {loadError ? (
-        <GlassCard className="mb-6 border-[var(--danger)]/40">
-          <p className="text-sm text-[var(--danger)]">{loadError}</p>
-        </GlassCard>
-      ) : null}
+        {loadError ? (
+          <p className={`${styles.banner} ${styles.bannerError}`}>{loadError}</p>
+        ) : null}
+        {banner ? (
+          <p className={`${styles.banner} ${banner.type === "success" ? styles.bannerSuccess : styles.bannerError}`}>
+            {banner.text}
+          </p>
+        ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <GlassCard tilt>
-          <h2 className="mb-4 flex items-center gap-2 font-semibold text-[var(--angora-goat)]">
-            <Upload className="h-5 w-5 text-[var(--orchid-hush)]" />
-            Upload School Template
-          </h2>
-          <form onSubmit={upload} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">School</label>
-              <select className="select-glass w-full" value={schoolId} onChange={(e) => setSchoolId(e.target.value)} required>
-                {schools.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">Template name</label>
-              <input className="input-glass" placeholder="e.g. 2025-26 Student ID Card" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
-                ID card template (PDF recommended)
-              </label>
-              <input
-                className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-              />
-              <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">
-                PDF is converted automatically on the server — no CorelDRAW required. PNG and JPG also work.
-              </p>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm text-[var(--muted-foreground)]">
-                Field layout JSON (recommended for custom designs)
-              </label>
-              <input
-                className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
-                type="file"
-                accept=".json,application/json"
-                onChange={(e) => setLayoutFile(e.target.files?.[0] ?? null)}
-              />
-              <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">
-                Upload <code className="text-[var(--angora-goat)]">sample-template.layout.json</code> so name, ID, and address align with your artwork.
-              </p>
-            </div>
-            <div>
-              <label className="mb-1.5 flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
-                <PenLine className="h-4 w-4" />
-                Principal signature (PNG/JPG, optional)
-              </label>
-              <input
-                className="input-glass file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--vintage-grape)] file:px-3 file:py-1 file:text-sm file:text-[var(--angora-goat)]"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => setSignature(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-[var(--muted-foreground)]">
-              <p className="mb-2 font-medium text-[var(--angora-goat)]">Exporting from CorelDRAW</p>
-              <ul className="space-y-1">
-                <li>• Set page size to <strong>85.6×53.98 mm</strong> (CR-80 card).</li>
-                <li>• File → Publish to PDF → <strong>300 DPI</strong>, or Export → PDF.</li>
-                <li>• Upload the <strong>.pdf</strong> here — the portal renders it at 1011×638 px for printing.</li>
-                <li>• Principal signature is uploaded separately and stays the same on every card.</li>
-                <li>• Per student: photo, name, enroll ID, class/section, phone, address are filled automatically.</li>
-              </ul>
-            </div>
-            {message ? (
-              <p className={`text-sm ${messageType === "error" ? "text-[var(--danger)]" : "text-success"}`}>{message}</p>
+        <div className={styles.toolbarRow}>
+          <div className={styles.schoolSelectWrap}>
+            <label className={styles.formLabel} htmlFor="template-page-school">
+              School
+            </label>
+            <select
+              id="template-page-school"
+              className={styles.formSelect}
+              value={schoolId}
+              onChange={(e) => onSchoolChange(e.target.value)}
+            >
+              {schools.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.toolbarAside}>
+            {selectedSchool ? (
+              <span className={styles.schoolBadge} style={{ background: selectedSchool.accentColor }}>
+                {selectedSchool.code}
+              </span>
             ) : null}
-            <button type="submit" disabled={loading} className="btn-primary w-full rounded-xl py-2.5">
-              {loading ? "Working…" : "Save Template"}
-            </button>
-          </form>
-        </GlassCard>
+            <Link href="/schools" className={dash.linkBtn}>
+              Manage schools
+            </Link>
+          </div>
+        </div>
 
-        <GlassCard>
-          <h2 className="mb-4 flex items-center gap-2 font-semibold text-[var(--angora-goat)]">
-            <FileImage className="h-5 w-5 text-[var(--endless-slumber)]" />
-            School Templates
-          </h2>
-          {templates.length === 0 ? (
-            <p className="text-sm text-[var(--muted-foreground)]">No templates uploaded yet. Upload a template to start printing ID cards.</p>
-          ) : (
-            <div className="space-y-4">
-              {templates.map((t) => (
-                <div key={t.id} className="surface-row overflow-hidden">
-                  <div className="flex items-center justify-between p-3">
-                    <div>
-                      <p className="font-medium">{t.name}</p>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        <Badge color={t.school.accentColor}>{t.school.code}</Badge>
-                        <span className="text-xs text-[var(--muted-foreground)]">{t.school.name}</span>
+        <div className={styles.statsRow}>
+          <div className={styles.statPill}>
+            <div className={styles.statPillIcon}>
+              <FileImage className="h-5 w-5" />
+            </div>
+            <div>
+              <p className={styles.statPillValue}>{stats.total}</p>
+              <p className={styles.statPillLabel}>Templates for school</p>
+            </div>
+          </div>
+          <div className={styles.statPill}>
+            <div className={`${styles.statPillIcon} ${styles.statPillIconBlue}`}>
+              <LayoutTemplate className="h-5 w-5" />
+            </div>
+            <div>
+              <p className={styles.statPillValue}>{stats.withLayout}</p>
+              <p className={styles.statPillLabel}>With field layout</p>
+            </div>
+          </div>
+          <div className={styles.statPill}>
+            <div className={`${styles.statPillIcon} ${styles.statPillIconPurple}`}>
+              <PenLine className="h-5 w-5" />
+            </div>
+            <div>
+              <p className={styles.statPillValue}>{stats.withSignature}</p>
+              <p className={styles.statPillLabel}>With signature</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.mainGrid}>
+          <section className={styles.uploadPanel}>
+            <h2 className={styles.uploadTitle}>
+              <Upload className="h-5 w-5 text-[#0d9488]" />
+              Upload template
+            </h2>
+            <form onSubmit={upload} className={styles.formStack}>
+              {selectedSchool ? (
+                <p className={styles.formHint}>
+                  Uploading for{" "}
+                  <span className={styles.schoolCode} style={{ background: selectedSchool.accentColor }}>
+                    {selectedSchool.name} ({selectedSchool.code})
+                  </span>
+                </p>
+              ) : null}
+              <div>
+                <label className={styles.formLabel} htmlFor="template-name">
+                  Template name
+                </label>
+                <input
+                  id="template-name"
+                  className={styles.formInput}
+                  placeholder="2025-26 Student ID Card"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={styles.formLabel} htmlFor="template-file">
+                  ID card file (PDF recommended)
+                </label>
+                <input
+                  id="template-file"
+                  className={`${styles.formInput} ${styles.fileInput}`}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  required
+                />
+                <p className={styles.formHint}>
+                  PDF is converted on the server at CR-80 (1011×638 px). PNG and JPG also work.
+                </p>
+                {file ? <p className={styles.formHint}>Selected: {file.name}</p> : null}
+              </div>
+              <div>
+                <label className={styles.formLabel} htmlFor="template-layout">
+                  Layout JSON (optional)
+                </label>
+                <input
+                  id="template-layout"
+                  className={`${styles.formInput} ${styles.fileInput}`}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(e) => setLayoutFile(e.target.files?.[0] ?? null)}
+                />
+                <p className={styles.formHint}>
+                  Or use <strong>Edit layout</strong> after upload to drag fields into place — no JSON needed.
+                </p>
+              </div>
+              <div>
+                <label className={styles.formLabel} htmlFor="template-signature">
+                  Principal signature (optional)
+                </label>
+                <input
+                  id="template-signature"
+                  className={`${styles.formInput} ${styles.fileInput}`}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setSignature(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <div className={styles.tipsBox}>
+                <p className={styles.tipsTitle}>Exporting from CorelDRAW</p>
+                <ul className="space-y-1">
+                  <li>Page size: 85.6×53.98 mm (CR-80).</li>
+                  <li>Export PDF at 300 DPI, then upload here.</li>
+                  <li>Signature is reused on every card; student fields are filled at print.</li>
+                </ul>
+              </div>
+              <button type="submit" disabled={loading || !file || !schoolId} className={styles.submitBtn}>
+                {loading ? "Working…" : "Save template"}
+              </button>
+            </form>
+          </section>
+
+          <section className={styles.listPanel}>
+            <div className={styles.listHeader}>
+              <h2 className={styles.listTitle}>School templates</h2>
+              <p className="text-sm text-[#64748b]">
+                {visibleTemplates.length} for {selectedSchool?.code ?? "school"}
+              </p>
+            </div>
+            {visibleTemplates.length === 0 ? (
+              <p className={styles.empty}>
+                {selectedSchool
+                  ? `No template for ${selectedSchool.name} yet. Upload a PDF or PNG on the left.`
+                  : "Select a school, then upload a PDF or PNG to start printing ID cards."}
+              </p>
+            ) : (
+              <div
+                className={`${styles.templateGrid} ${
+                  visibleTemplates.length === 2 ? styles.templateGridDouble : ""
+                }`}
+              >
+                {visibleTemplates.map((t) => (
+                  <article key={t.id} className={styles.templateCard}>
+                    <div className={styles.templateCardHead}>
+                      <p className={styles.templateName}>{t.name}</p>
+                      <div className={styles.metaRow}>
+                        <span className={styles.schoolCode} style={{ background: t.school.accentColor }}>
+                          {t.school.code}
+                        </span>
+                        <span className={styles.metaText}>{t.school.name}</span>
                         {t.sourceFormat ? (
-                          <span className="text-xs text-[var(--muted-foreground)]">Source: {t.sourceFormat.toUpperCase()}</span>
+                          <span className={styles.metaText}>{t.sourceFormat.toUpperCase()}</span>
                         ) : null}
                         {t.hasLayout ? (
-                          <span className="text-xs text-success">Field layout configured</span>
+                          <span className={styles.statusOk}>Layout saved</span>
                         ) : (
-                          <span className="text-xs text-warning">No field layout — may misalign</span>
+                          <span className={styles.statusWarn}>Layout needed</span>
                         )}
-                        {t.signatureUrl ? (
-                          <span className="text-xs text-success">Signature attached</span>
-                        ) : (
-                          <span className="text-xs text-[var(--muted-foreground)]">No signature</span>
-                        )}
+                        <span className={styles.metaText}>
+                          Updated {new Date(t.updatedAt).toLocaleString()}
+                        </span>
                       </div>
                     </div>
-                    {isAdmin ? (
-                      <button
-                        type="button"
-                        onClick={() => removeTemplate(t.id, t.name)}
-                        className="btn-ghost flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-[var(--danger)]"
-                        title="Delete template"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    ) : null}
-                  </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={t.fileUrl}
-                    alt={t.name}
-                    className="h-48 w-full object-contain bg-white/10 p-2"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                  {t.signatureUrl ? (
-                    <div className="border-t border-white/10 p-3">
-                      <p className="mb-2 text-xs text-[var(--muted-foreground)]">Principal signature</p>
+                    <div className={styles.previewWrap}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={t.signatureUrl} alt="Principal signature" className="h-12 object-contain" />
+                      <img
+                        key={t.updatedAt}
+                        src={t.fileUrl}
+                        alt={t.name}
+                        className={styles.previewImg}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
                     </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </GlassCard>
+                    {t.sourceUrl ? (
+                      <p className={styles.sourcePdfRow}>
+                        <a href={t.sourceUrl} target="_blank" rel="noopener noreferrer" className={dash.linkBtn}>
+                          Open uploaded PDF
+                        </a>
+                        <span className={styles.metaText}>Preview is converted from this file</span>
+                      </p>
+                    ) : null}
+                    {t.signatureUrl ? (
+                      <div className={styles.signatureRow}>
+                        <p className={styles.signatureLabel}>Principal signature</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={t.signatureUrl} alt="Signature" className={styles.signatureImg} />
+                      </div>
+                    ) : null}
+                    {isLoggedIn ? (
+                      <div className={styles.cardFooter}>
+                        <div className={styles.cardActions}>
+                          <Link href={`/templates/${t.id}/layout`} className={styles.actionPrimary}>
+                            <Move className="h-4 w-4" />
+                            Edit layout
+                          </Link>
+                          <button
+                            type="button"
+                            className={`${styles.actionGhost} ${styles.actionDanger}`}
+                            onClick={() => setDeleteTarget(t)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
+
+      {deleteTarget ? (
+        <div className={dash.modalBackdrop} onClick={() => setDeleteTarget(null)}>
+          <div className={dash.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2 className={dash.modalTitle}>Delete {deleteTarget.name}?</h2>
+            <p className="mt-2 text-sm text-[#64748b]">
+              Removes the template, layout, and signature for {deleteTarget.school.name}.
+            </p>
+            <div className={`${dash.modalActions} mt-4`}>
+              <button type="button" className={dash.modalCancel} onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={dash.modalSubmit}
+                style={{ background: "#dc2626" }}
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? "Deleting…" : "Delete template"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

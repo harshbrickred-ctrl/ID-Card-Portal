@@ -1,0 +1,509 @@
+.statsRow {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .statsRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.statPill {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.statPillIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: #ccfbf1;
+  color: #0d9488;
+}
+
+.statPillIconBlue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.statPillIconPurple {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.statPillValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.statPillLabel {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.banner {
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.bannerSuccess {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.bannerError {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.formLabel {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.formInput,
+.formSelect {
+  width: 100%;
+  min-height: 2.875rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  outline: none;
+  background: #fff;
+}
+
+.formInput:focus,
+.formSelect:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.formHint {
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.fileInput {
+  font-size: 0.8125rem;
+}
+
+.mainGrid {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .mainGrid {
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  }
+}
+
+.uploadPanel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.35rem 1.35rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.uploadTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.formStack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.tipsBox {
+  margin-top: 0.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.tipsTitle {
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.submitBtn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.listPanel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.125rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.listTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.templateGrid {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1280px) {
+  .templateGridDouble {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.templateCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.templateCardHead {
+  padding: 1rem 1.15rem 0.85rem;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.templateName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.schoolCode {
+  display: inline-flex;
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.metaText {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.statusOk {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.statusWarn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #d97706;
+}
+
+.cardFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.actionPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: #0d9488;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.55rem 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.actionPrimary:hover {
+  background: #0f766e;
+}
+
+.actionGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+}
+
+.actionGhost:hover {
+  border-color: #fecaca;
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.actionDanger {
+  margin-left: auto;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.actionDanger:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.previewWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 11rem;
+  padding: 1rem 1.15rem;
+  background: #fff;
+}
+
+.previewImg {
+  width: 100%;
+  max-height: 14rem;
+  object-fit: contain;
+}
+
+.sourcePdfRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.signatureRow {
+  padding: 0.65rem 1rem 0.85rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.signatureLabel {
+  margin-bottom: 0.35rem;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.signatureImg {
+  height: 2.5rem;
+  object-fit: contain;
+}
+
+.progressBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.progressDialog {
+  width: min(100%, 24rem);
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
+}
+
+.progressTitle {
+  margin-top: 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.progressHint {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.progressBar {
+  margin-top: 1.25rem;
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #e2e8f0;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #0d9488, #2dd4bf);
+  transition: width 0.3s ease;
+}
+
+.progressDots {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+
+.progressDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #0d9488;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.toolbarRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.toolbarAside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  min-height: 2.875rem;
+}
+
+.schoolSelectWrap {
+  min-width: min(100%, 16rem);
+  flex: 1;
+}
+
+.schoolBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.empty {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748b;
+}

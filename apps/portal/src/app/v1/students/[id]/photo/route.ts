@@ -1,4 +1,5 @@
-import { BadRequestError, requireAuth, withApi } from "@idportal/api-kit";
+import { BadRequestError, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import { resolveImageExtension } from "@/server/image-utils";
 import * as studentService from "@/server/student-service";
 
