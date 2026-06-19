@@ -13,13 +13,21 @@ const nextConfig: NextConfig = {
     "@idportal/contracts",
     "@idportal/db",
   ],
-  serverExternalPackages: ["sharp", "bcryptjs", "pdf-to-png-converter", "pdfjs-dist"],
+  serverExternalPackages: [
+    "sharp",
+    "bcryptjs",
+    "pdf-to-png-converter",
+    "pdfjs-dist",
+    "@napi-rs/canvas",
+  ],
   // Hoisted deps live at monorepo root — include them in serverless traces (pdfjs cmaps/fonts).
   outputFileTracingRoot: monorepoRoot,
   outputFileTracingIncludes: {
     "/**": [
       "../../node_modules/pdfjs-dist/**",
       "../../node_modules/pdf-to-png-converter/**",
+      "../../node_modules/@napi-rs/canvas/**",
+      "../../node_modules/@napi-rs/canvas-*/**",
     ],
   },
 };
