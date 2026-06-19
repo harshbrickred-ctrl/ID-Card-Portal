@@ -17,6 +17,12 @@ function createPrismaClient(): PrismaClient {
 }
 
 function getPrisma(): PrismaClient {
+  const cached = globalForPrisma.prisma;
+  // Recreate if hot-reload left a client generated before a schema change (e.g. new Session model).
+  if (cached && !(cached as PrismaClient & { session?: unknown }).session) {
+    void cached.$disconnect().catch(() => {});
+    globalForPrisma.prisma = undefined;
+  }
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
   }

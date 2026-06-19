@@ -4,99 +4,136 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
+  BarChart3,
+  CreditCard,
   GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   Printer,
+  Settings,
   Users,
   FileImage,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
+import styles from "./portal-shell.module.css";
 
 const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/templates", label: "Templates", icon: FileImage },
-  { href: "/students", label: "Students", icon: Users },
-  { href: "/print", label: "Print", icon: Printer },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, match: "exact" as const },
+  { href: "/schools", label: "Schools", icon: GraduationCap, match: "path" as const },
+  { href: "/students", label: "Students", icon: Users, match: "path" as const },
+  { href: "/templates", label: "Templates", icon: FileImage, match: "path" as const },
+  { href: "/print", label: "Print IDs", icon: Printer, match: "path" as const },
+  { href: "#reports", label: "Reports", icon: BarChart3, match: "none" as const },
+  { href: "#settings", label: "Settings", icon: Settings, match: "none" as const },
 ];
+
+function isNavActive(
+  item: (typeof nav)[number],
+  pathname: string,
+): boolean {
+  if (item.match === "none") return false;
+  if (item.match === "exact") return pathname === "/dashboard";
+  if (item.match === "path") return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  return false;
+}
+
+function userInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { token, user, logout, hydrate, isSuperAdmin } = useAuthStore();
+  const { user, hydrated, logout, hydrate, isSuperAdmin } = useAuthStore();
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
   useEffect(() => {
-    if (!token && pathname !== "/login") {
+    if (!hydrated) return;
+    if (!user && pathname !== "/login") {
       router.replace("/login");
     }
-  }, [token, pathname, router]);
+  }, [user, hydrated, pathname, router]);
+
+  const isLightShell =
+    pathname === "/dashboard" ||
+    pathname === "/schools" ||
+    pathname === "/students" ||
+    pathname === "/templates" ||
+    pathname.startsWith("/templates/") ||
+    pathname === "/print" ||
+    pathname.startsWith("/print/");
 
   if (pathname === "/login") {
-    return (
-      <>
-        <div className="mesh-bg" />
-        {children}
-      </>
-    );
+    return <>{children}</>;
   }
 
   return (
     <>
-      <div className="mesh-bg" />
-      <div className="flex min-h-screen">
-        <aside className="glass fixed inset-y-0 left-0 z-20 flex w-[17.5rem] flex-col p-5">
-          <div className="mb-10 flex items-center gap-3">
-            <div className="logo-mark flex h-11 w-11 items-center justify-center rounded-2xl">
-              <GraduationCap className="h-5 w-5" />
+      {!isLightShell ? <div className="mesh-bg" /> : null}
+      <div className={styles.appFrame}>
+        <aside className={styles.sidebar}>
+          <div className={styles.brand}>
+            <div className={styles.brandIcon}>
+              <CreditCard className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-bold leading-tight text-[var(--angora-goat)]">School ID Cards</p>
-              <p className="text-xs text-[var(--cinema-screen)]">Print Portal</p>
+              <p className={styles.brandTitle}>School ID Cards</p>
+              <p className={styles.brandSub}>Print Portal</p>
             </div>
           </div>
 
-          <nav className="flex-1 space-y-1.5">
-            {nav.map((item) => {
-              const active = pathname === item.href;
+          <nav className={styles.nav}>
+            {nav.map((item, index) => {
+              const active = isNavActive(item, pathname);
+              const showDivider = item.match === "none" && index === nav.findIndex((n) => n.match === "none");
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all",
-                    active
-                      ? "nav-active"
-                      : "text-[var(--endless-slumber)] hover:bg-white/5 hover:text-[var(--orchid-hush)]",
-                  )}
-                >
-                  <item.icon className={cn("h-4 w-4", active && "text-[var(--angora-goat)]")} />
-                  {item.label}
-                </Link>
+                <div key={item.label}>
+                  {showDivider ? <div className={styles.navDivider} aria-hidden="true" /> : null}
+                  <Link
+                    href={item.href}
+                    className={cn(styles.navLink, active && styles.navLinkActive)}
+                    onClick={
+                      item.match === "none"
+                        ? (e) => e.preventDefault()
+                        : undefined
+                    }
+                  >
+                    <span className={styles.navIcon} aria-hidden="true">
+                      <item.icon className="h-4 w-4" />
+                    </span>
+                    {item.label}
+                  </Link>
+                </div>
               );
             })}
           </nav>
 
-          <div className="rounded-xl border border-[var(--border)] bg-black/15 p-3">
-            <p className="truncate text-sm font-medium text-[var(--angora-goat)]">
-              {user?.name ?? "Admin"}
-            </p>
-            <p className="truncate text-xs text-[var(--cinema-screen)]">{user?.email}</p>
-            <p className="mt-1 text-xs text-[var(--endless-slumber)]">
-              {isSuperAdmin() ? "Super Admin" : "Admin"} ·{" "}
-              {isSuperAdmin() ? "Full access" : "Can manage templates"}
-            </p>
+          <div className={styles.userCard}>
+            <div className={styles.userRow}>
+              <div className={styles.userAvatar}>{userInitials(user?.name ?? "SA")}</div>
+              <div className={styles.userMeta}>
+                <p className={styles.userName}>{user?.name ?? "School Admin"}</p>
+                <p className={styles.userEmail}>{user?.email ?? ""}</p>
+              </div>
+            </div>
+            <span className={styles.roleBadge}>{isSuperAdmin() ? "Super Admin" : "Admin"}</span>
+            <Link href="/dashboard" className={styles.helpLink}>
+              <HelpCircle className="h-4 w-4" />
+              Help Center
+            </Link>
             <button
               type="button"
               onClick={() => {
-                logout();
-                router.push("/login");
+                void logout().then(() => router.push("/login"));
               }}
-              className="btn-ghost mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm"
+              className={styles.signOut}
             >
               <LogOut className="h-4 w-4" />
               Sign out
@@ -104,7 +141,16 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <main className="ml-[17.5rem] flex-1 p-8 lg:p-10">{children}</main>
+        <div className={cn(styles.contentColumn, isLightShell && styles.contentColumnDashboard)}>
+          <main className={cn(styles.main, isLightShell && styles.mainDashboard)}>{children}</main>
+          {isLightShell ? (
+            <footer className={styles.footer}>
+              <div className={styles.footerInner}>
+                © {new Date().getFullYear()} School ID Cards Print Portal. All rights reserved.
+              </div>
+            </footer>
+          ) : null}
+        </div>
       </div>
     </>
   );

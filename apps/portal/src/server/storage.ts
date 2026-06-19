@@ -79,3 +79,9 @@ export function publicFileUrl(stored: string): string {
   if (isRemoteUrl(stored)) return stored;
   return `/api/files/${normalizeRelPath(stored)}`;
 }
+
+export function versionedPublicUrl(stored: string, version: Date | number | string): string {
+  const base = publicFileUrl(stored);
+  const v = version instanceof Date ? version.getTime() : String(version);
+  return `${base}?v=${v}`;
+}

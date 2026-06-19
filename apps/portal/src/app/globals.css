@@ -261,3 +261,8 @@ table tbody tr {
 table tbody tr:hover {
   background: rgba(111, 99, 109, 0.2);
 }
+
+body.login-page {
+  background: #f8fafc;
+  color: #0f172a;
+}

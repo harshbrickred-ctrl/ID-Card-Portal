@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAuth, validateBody, withApi } from "@idportal/api-kit";
+import { validateBody, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import { PrintExecuteSchema } from "@idportal/contracts";
 import * as printService from "@/server/print-service";
 

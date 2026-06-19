@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CARD_HEIGHT, CARD_WIDTH } from "../src/constants.ts";
 import { scaleTemplateLayout } from "../src/layout.ts";
+import { createDefaultLayoutForSource } from "@idportal/contracts";
 
 describe("scaleTemplateLayout", () => {
   it("scales coordinates from source design size to CR-80", () => {
@@ -27,5 +28,15 @@ describe("scaleTemplateLayout", () => {
       signature: { x: 700, y: 520, width: 240, height: 90 },
     };
     assert.deepEqual(scaleTemplateLayout(layout), layout);
+  });
+});
+
+describe("createDefaultLayoutForSource", () => {
+  it("creates proportional default layout for source dimensions", () => {
+    const layout = createDefaultLayoutForSource(1576, 998);
+    assert.equal(layout.sourceWidth, 1576);
+    assert.equal(layout.sourceHeight, 998);
+    assert.ok(layout.fields.length >= 6);
+    assert.ok(layout.photo.width > 0);
   });
 });

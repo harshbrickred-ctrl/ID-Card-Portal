@@ -14,7 +14,7 @@ Simple MVP for school student ID card printing.
 
 ```bash
 cp .env.example .env
-# Set DATABASE_URL and JWT_SECRET (32+ chars)
+# Set DATABASE_URL
 
 npm install
 npm run db:generate

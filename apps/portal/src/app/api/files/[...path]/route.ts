@@ -15,9 +15,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
         ? "image/webp"
         : ext === "jpg" || ext === "jpeg"
           ? "image/jpeg"
-          : "application/octet-stream";
+          : ext === "pdf"
+            ? "application/pdf"
+            : "application/octet-stream";
 
   return new NextResponse(new Uint8Array(buffer), {
-    headers: { "Content-Type": type, "Cache-Control": "private, max-age=3600" },
+    headers: {
+      "Content-Type": type,
+      "Cache-Control": relPath.startsWith("templates/")
+        ? "private, no-cache, must-revalidate"
+        : "private, max-age=3600",
+    },
   });
 }

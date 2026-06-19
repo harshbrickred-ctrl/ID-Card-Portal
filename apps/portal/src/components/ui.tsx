@@ -103,3 +103,60 @@ export function Badge({
     </span>
   );
 }
+
+export function ZoomControls({
+  zoom,
+  onZoomChange,
+  min = 0.5,
+  max = 2.5,
+  step = 0.25,
+  label = "Zoom",
+}: {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label?: string;
+}) {
+  const clampZoom = (value: number) => Math.min(max, Math.max(min, value));
+
+  return (
+    <div
+      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1"
+      aria-label={label}
+    >
+      <span className="hidden text-xs text-[var(--muted-foreground)] sm:inline">{label}</span>
+      <button
+        type="button"
+        className="btn-ghost rounded-lg px-2.5 py-1 text-sm leading-none"
+        disabled={zoom <= min}
+        onClick={() => onZoomChange(clampZoom(Number((zoom - step).toFixed(2))))}
+        aria-label="Zoom out"
+      >
+        −
+      </button>
+      <span className="min-w-12 text-center text-xs font-medium text-[var(--angora-goat)]">
+        {Math.round(zoom * 100)}%
+      </span>
+      <button
+        type="button"
+        className="btn-ghost rounded-lg px-2.5 py-1 text-sm leading-none"
+        disabled={zoom >= max}
+        onClick={() => onZoomChange(clampZoom(Number((zoom + step).toFixed(2))))}
+        aria-label="Zoom in"
+      >
+        +
+      </button>
+      {zoom !== 1 ? (
+        <button
+          type="button"
+          className="btn-ghost rounded-lg px-2 py-1 text-xs"
+          onClick={() => onZoomChange(1)}
+        >
+          Reset
+        </button>
+      ) : null}
+    </div>
+  );
+}

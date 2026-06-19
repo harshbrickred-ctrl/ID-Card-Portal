@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
-import { BadRequestError, requireAuth, withApi } from "@idportal/api-kit";
+import { BadRequestError, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import * as studentService from "@/server/student-service";
 
 export const POST = withApi(async (req: NextRequest) => {

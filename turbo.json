@@ -4,7 +4,6 @@
   "globalEnv": [
     "NODE_ENV",
     "DATABASE_URL",
-    "JWT_SECRET",
     "PORTAL_URL",
     "BLOB_READ_WRITE_TOKEN",
     "BLOB_STORE_ID",

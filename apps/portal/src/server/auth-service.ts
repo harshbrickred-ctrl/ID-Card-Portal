@@ -1,7 +1,8 @@
 import { compareSync } from "bcryptjs";
 import { prisma } from "@idportal/db";
-import { signPortalToken, UnauthorizedError } from "@idportal/api-kit";
+import { UnauthorizedError } from "@idportal/api-kit";
 import type { LoginDto } from "@idportal/contracts";
+import { createSession } from "./session-auth";
 
 export async function login(dto: LoginDto) {
   const user = await prisma.user.findUnique({ where: { email: dto.email } });
@@ -9,15 +10,11 @@ export async function login(dto: LoginDto) {
     throw new UnauthorizedError("Invalid email or password");
   }
 
-  const token = await signPortalToken({
-    sub: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  });
+  const session = await createSession(user.id);
 
   return {
-    token,
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    sessionToken: session.token,
+    expiresAt: session.expiresAt,
   };
 }

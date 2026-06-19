@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
-import { requireAuth, validateBody, withApi } from "@idportal/api-kit";
+import { validateBody, withApi } from "@idportal/api-kit";
+import { requireAuth } from "@/server/session-auth";
 import { StudentSchema } from "@idportal/contracts";
 import * as studentService from "@/server/student-service";
 
