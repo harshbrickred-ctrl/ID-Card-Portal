@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
     "@idportal/contracts",
     "@idportal/db",
   ],
-  serverExternalPackages: ["sharp", "bcryptjs", "pdf-to-png-converter"],
+  serverExternalPackages: ["sharp", "bcryptjs", "pdf-to-png-converter", "pdfjs-dist"],
 };
 
 export default nextConfig;

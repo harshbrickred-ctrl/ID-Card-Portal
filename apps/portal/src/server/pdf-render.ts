@@ -2,10 +2,38 @@ import { createRequire } from "module";
 import path from "path";
 import type { PdfToPngOptions, PngPageOutput } from "pdf-to-png-converter";
 
-const requireFromPortal = createRequire(path.join(process.cwd(), "package.json"));
+function resolvePdfJsRoot(): string {
+  const anchors = [
+    path.join(process.cwd(), "package.json"),
+    path.join(process.cwd(), "../../package.json"),
+  ];
 
-function pdfjsAssetUrl(...segments: string[]): string {
-  const pdfjsRoot = path.dirname(requireFromPortal.resolve("pdfjs-dist/package.json"));
+  for (const anchor of anchors) {
+    try {
+      const req = createRequire(anchor);
+      return path.dirname(req.resolve("pdfjs-dist/package.json"));
+    } catch {
+      /* try next anchor */
+    }
+  }
+
+  for (const anchor of anchors) {
+    try {
+      const req = createRequire(anchor);
+      const converterMain = req.resolve("pdf-to-png-converter");
+      const reqFromConverter = createRequire(converterMain);
+      return path.dirname(reqFromConverter.resolve("pdfjs-dist/package.json"));
+    } catch {
+      /* try next anchor */
+    }
+  }
+
+  throw new Error(
+    "pdfjs-dist is not installed. Run npm install in the monorepo root and redeploy.",
+  );
+}
+
+function pdfjsAssetUrl(pdfjsRoot: string, ...segments: string[]): string {
   return `${path.join(pdfjsRoot, ...segments).replace(/\\/g, "/")}/`;
 }
 
@@ -16,13 +44,15 @@ function patchPdfToPngAssetPaths() {
   if (pathsPatched) return;
   pathsPatched = true;
 
-  const converterOutDir = path.dirname(requireFromPortal.resolve("pdf-to-png-converter"));
-  const normalizePathModule = requireFromPortal(path.join(converterOutDir, "normalizePath.js")) as {
+  const portalReq = createRequire(path.join(process.cwd(), "package.json"));
+  const converterOutDir = path.dirname(portalReq.resolve("pdf-to-png-converter"));
+  const normalizePathModule = portalReq(path.join(converterOutDir, "normalizePath.js")) as {
     normalizePath: (relativePath: string) => string;
   };
 
-  const cMapUrl = pdfjsAssetUrl("cmaps");
-  const standardFontDataUrl = pdfjsAssetUrl("standard_fonts");
+  const pdfjsRoot = resolvePdfJsRoot();
+  const cMapUrl = pdfjsAssetUrl(pdfjsRoot, "cmaps");
+  const standardFontDataUrl = pdfjsAssetUrl(pdfjsRoot, "standard_fonts");
 
   const original = normalizePathModule.normalizePath;
   normalizePathModule.normalizePath = (relativePath: string) => {
