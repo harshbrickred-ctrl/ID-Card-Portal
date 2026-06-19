@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
       "../../node_modules/pdf-to-png-converter/**",
       "../../node_modules/@napi-rs/canvas/**",
       "../../node_modules/@napi-rs/canvas-*/**",
+      "../../node_modules/@napi-rs/canvas/geometry.js",
     ],
   },
 };

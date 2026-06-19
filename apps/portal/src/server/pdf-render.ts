@@ -1,3 +1,5 @@
+import "./pdf-node-polyfills";
+
 import { createRequire } from "module";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -40,38 +42,11 @@ function pdfjsAssetUrl(pdfjsRoot: string, ...segments: string[]): string {
 }
 
 let pathsPatched = false;
-let polyfillsReady: Promise<void> | null = null;
 
-/** pdfjs-dist on Node needs DOMMatrix/Path2D/ImageData from @napi-rs/canvas. */
-async function ensurePdfNodePolyfills() {
-  if (polyfillsReady) return polyfillsReady;
-
-  polyfillsReady = (async () => {
-    if (typeof globalThis.DOMMatrix !== "undefined") return;
-
-    try {
-      const canvas = await import("@napi-rs/canvas");
-      if (canvas.DOMMatrix) {
-        globalThis.DOMMatrix = canvas.DOMMatrix as typeof DOMMatrix;
-      }
-      if (canvas.ImageData) {
-        globalThis.ImageData = canvas.ImageData as typeof ImageData;
-      }
-      if (canvas.Path2D) {
-        globalThis.Path2D = canvas.Path2D as typeof Path2D;
-      }
-    } catch {
-      throw new Error(
-        "@napi-rs/canvas is required for PDF conversion. Install dependencies and redeploy.",
-      );
-    }
-
-    if (typeof globalThis.DOMMatrix === "undefined") {
-      throw new Error("PDF conversion failed: DOMMatrix polyfill unavailable.");
-    }
-  })();
-
-  return polyfillsReady;
+function assertPdfNodePolyfills() {
+  if (typeof globalThis.DOMMatrix === "undefined") {
+    throw new Error("PDF conversion failed: DOMMatrix polyfill unavailable.");
+  }
 }
 
 /**
@@ -107,7 +82,7 @@ export async function pdfToPng(
   input: string | ArrayBufferLike | Uint8Array,
   options?: PdfToPngOptions,
 ): Promise<PngPageOutput[]> {
-  await ensurePdfNodePolyfills();
+  assertPdfNodePolyfills();
   patchPdfToPngAssetPaths();
   const { pdfToPng: convert } = await import("pdf-to-png-converter");
   return convert(input, options);
