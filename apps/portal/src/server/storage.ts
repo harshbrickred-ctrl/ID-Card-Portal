@@ -37,6 +37,7 @@ export async function saveFile(relPath: string, data: Buffer): Promise<string> {
     const blob = await put(normalized, data, {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
     return blob.url;
   }
