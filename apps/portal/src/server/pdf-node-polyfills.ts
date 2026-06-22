@@ -10,20 +10,18 @@ const requireFromThisFile = createRequire(import.meta.url);
 function installGeometryPolyfills(): void {
   if (typeof globalThis.DOMMatrix !== "undefined") return;
 
-  const { DOMMatrix, DOMPoint, DOMRect } = requireFromThisFile(
-    "@napi-rs/canvas/geometry.js",
-  ) as {
-    DOMMatrix: typeof DOMMatrix;
-    DOMPoint: typeof DOMPoint;
-    DOMRect: typeof DOMRect;
+  const geometry = requireFromThisFile("@napi-rs/canvas/geometry.js") as {
+    DOMMatrix: typeof globalThis.DOMMatrix;
+    DOMPoint: typeof globalThis.DOMPoint;
+    DOMRect: typeof globalThis.DOMRect;
   };
 
-  globalThis.DOMMatrix = DOMMatrix;
+  globalThis.DOMMatrix = geometry.DOMMatrix;
   if (typeof globalThis.DOMPoint === "undefined") {
-    globalThis.DOMPoint = DOMPoint;
+    globalThis.DOMPoint = geometry.DOMPoint;
   }
   if (typeof globalThis.DOMRect === "undefined") {
-    globalThis.DOMRect = DOMRect;
+    globalThis.DOMRect = geometry.DOMRect;
   }
 }
 
