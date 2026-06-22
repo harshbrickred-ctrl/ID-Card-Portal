@@ -59,12 +59,17 @@ function scaleNum(value: number, ratio: number) {
   return Math.round(value * ratio);
 }
 
-/** Map a layout authored at sourceWidth×sourceHeight onto the CR-80 canvas. */
-export function scaleTemplateLayout(layout: TemplateLayout): TemplateLayout {
+/** Map a layout authored at sourceWidth×sourceHeight onto a target print canvas. */
+export function scaleTemplateLayout(
+  layout: TemplateLayout,
+  targetWidth: number = CARD_WIDTH,
+  targetHeight: number = CARD_HEIGHT,
+): TemplateLayout {
   if (!layout.sourceWidth || !layout.sourceHeight) return layout;
+  if (layout.sourceWidth === targetWidth && layout.sourceHeight === targetHeight) return layout;
 
-  const sx = CARD_WIDTH / layout.sourceWidth;
-  const sy = CARD_HEIGHT / layout.sourceHeight;
+  const sx = targetWidth / layout.sourceWidth;
+  const sy = targetHeight / layout.sourceHeight;
 
   return {
     photoBorder: layout.photoBorder,

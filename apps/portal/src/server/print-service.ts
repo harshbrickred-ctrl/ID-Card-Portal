@@ -5,6 +5,7 @@ import {
   buildStudentPrintZip,
   renderStudentCard,
   renderStudentCardBack,
+  resolveCardDimensions,
   validateStudentCard,
 } from "@idportal/card-engine";
 import { loadStudentPhotoBuffer } from "./student-service";
@@ -182,6 +183,8 @@ export async function executePrint(
     throw new BadRequestError("Configure field layout in Templates → Edit layout before printing.");
   }
 
+  const cardDimensions = await resolveCardDimensions(layout, templateBuffer);
+
   const schoolData = {
     name: school.name,
     code: school.code,
@@ -200,7 +203,7 @@ export async function executePrint(
           signatureBuffer,
           layout: layout ?? undefined,
         }),
-        renderStudentCardBack(cardStudent, schoolData),
+        renderStudentCardBack(cardStudent, schoolData, cardDimensions),
       ]);
       return { enrollId: s.enrollId, name: s.name, front, back };
     }),

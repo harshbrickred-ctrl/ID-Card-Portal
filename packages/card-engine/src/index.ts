@@ -1,5 +1,7 @@
 export { CARD_WIDTH, CARD_HEIGHT } from "./constants";
 export { fitTemplateRaster, preserveExactTemplateRaster } from "./raster";
+export { resolveCardDimensions, scaleFromCr80 } from "./dimensions";
+export type { CardDimensions } from "./dimensions";
 export {
   DEFAULT_TEMPLATE_LAYOUT,
   DEFAULT_FIELD_LABELS,

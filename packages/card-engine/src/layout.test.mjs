@@ -29,6 +29,17 @@ describe("scaleTemplateLayout", () => {
     };
     assert.deepEqual(scaleTemplateLayout(layout), layout);
   });
+
+  it("returns layout unchanged when already at target size", () => {
+    const layout = {
+      sourceWidth: 1576,
+      sourceHeight: 998,
+      photo: { x: 50, y: 150, width: 200, height: 250 },
+      fields: [{ key: "name", x: 280, y: 180, fontSize: 32 }],
+      signature: { x: 700, y: 520, width: 240, height: 90 },
+    };
+    assert.deepEqual(scaleTemplateLayout(layout, 1576, 998), layout);
+  });
 });
 
 describe("createDefaultLayoutForSource", () => {

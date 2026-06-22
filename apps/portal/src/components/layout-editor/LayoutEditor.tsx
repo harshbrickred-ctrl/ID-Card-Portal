@@ -43,6 +43,7 @@ export type LayoutEditorTemplate = {
   sourceHeight: number | null;
   school: { name: string; code: string };
   dimensions: { width: number; height: number };
+  layoutRepaired?: boolean;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -87,8 +88,8 @@ function normalizeLayout(
 function ZoomBar({
   zoom,
   onChange,
-  min = 0.5,
-  max = 2.5,
+  min = 0.25,
+  max = 4,
   step = 0.25,
 }: {
   zoom: number;
@@ -138,7 +139,11 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMeta, setPreviewMeta] = useState<{ name: string; enrollId: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    template.layoutRepaired
+      ? "Your template was refreshed to show the full PDF page. Review field positions before saving."
+      : "",
+  );
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [zoom, setZoom] = useState(1);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -351,7 +356,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
             </Link>
             <div className={styles.toolbarMeta}>
               <span className={styles.dimBadge}>
-                {sourceWidth}×{sourceHeight}px · CR-80
+                {sourceWidth}×{sourceHeight}px
               </span>
               <ZoomBar zoom={zoom} onChange={setZoom} />
             </div>

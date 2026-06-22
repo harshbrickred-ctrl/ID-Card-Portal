@@ -1,5 +1,5 @@
 import { BadRequestError } from "@idportal/api-kit";
-import { CARD_HEIGHT, CARD_WIDTH, fitTemplateRaster, preserveExactTemplateRaster } from "@idportal/card-engine";
+import sharp from "sharp";
 import type { TemplateSourceFormat } from "./template-utils";
 import { isRasterTemplateFormat } from "./template-utils";
 import { pdfToPng } from "./pdf-render";
@@ -9,6 +9,11 @@ const PDF_PAGE_OPTS = {
   useSystemFonts: true,
   pagesToProcess: [1] as number[],
 };
+
+/** Render PDF pages at print resolution without cropping to CR-80. */
+const PDF_RENDER_DPI = 300;
+const PDF_BASE_DPI = 72;
+const PDF_MAX_SIDE_PX = 4096;
 
 async function rasterizePdf(buffer: Buffer): Promise<Buffer> {
   const metadata = await pdfToPng(buffer, {
@@ -21,7 +26,12 @@ async function rasterizePdf(buffer: Buffer): Promise<Buffer> {
     throw new BadRequestError("PDF template has no pages to render");
   }
 
-  const viewportScale = Math.min(CARD_WIDTH / meta.width, CARD_HEIGHT / meta.height);
+  let viewportScale = PDF_RENDER_DPI / PDF_BASE_DPI;
+  const scaledW = meta.width * viewportScale;
+  const scaledH = meta.height * viewportScale;
+  if (scaledW > PDF_MAX_SIDE_PX || scaledH > PDF_MAX_SIDE_PX) {
+    viewportScale *= Math.min(PDF_MAX_SIDE_PX / scaledW, PDF_MAX_SIDE_PX / scaledH);
+  }
 
   const pages = await pdfToPng(buffer, {
     ...PDF_PAGE_OPTS,
@@ -32,17 +42,16 @@ async function rasterizePdf(buffer: Buffer): Promise<Buffer> {
     throw new BadRequestError("PDF template could not be rendered");
   }
 
-  const raster = Buffer.from(first.content);
-  try {
-    return await preserveExactTemplateRaster(raster);
-  } catch {
-    return fitTemplateRaster(raster);
-  }
+  return sharp(Buffer.from(first.content)).png().toBuffer();
+}
+
+async function rasterizeRasterUpload(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer).png().toBuffer();
 }
 
 export async function rasterizeTemplate(buffer: Buffer, format: TemplateSourceFormat): Promise<Buffer> {
   if (isRasterTemplateFormat(format)) {
-    return fitTemplateRaster(buffer);
+    return rasterizeRasterUpload(buffer);
   }
 
   if (format === "pdf") {

@@ -1,9 +1,8 @@
 import { TemplateLayoutSchema, type TemplateLayoutDto } from "@idportal/contracts";
-import { scaleTemplateLayout, type TemplateLayout } from "@idportal/card-engine";
+import type { TemplateLayout } from "@idportal/card-engine";
 
 export function parseTemplateLayoutJson(raw: unknown): TemplateLayout {
-  const parsed = TemplateLayoutSchema.parse(raw) as TemplateLayoutDto;
-  return scaleTemplateLayout(parsed);
+  return TemplateLayoutSchema.parse(raw) as TemplateLayoutDto;
 }
 
 export function parseTemplateLayoutJsonOrNull(raw: unknown): TemplateLayout | null {

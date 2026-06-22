@@ -11,6 +11,66 @@ import { isRasterTemplateFormat } from "./template-utils";
 import { loadStudentPhotoBuffer } from "./student-service";
 import { remapLayoutDimensions } from "./layout-coordinates";
 
+/** Re-rasterize PDF templates that were previously cropped to CR-80 for the layout editor. */
+async function ensureFullPageTemplateRaster(template: {
+  id: string;
+  filePath: string;
+  sourcePath: string | null;
+  sourceFormat: string | null;
+  sourceWidth: number | null;
+  sourceHeight: number | null;
+  layoutJson: unknown;
+  updatedAt: Date;
+}): Promise<{ width: number; height: number; repaired: boolean; layoutJson: unknown } | null> {
+  if (template.sourceFormat !== "pdf" || !template.sourcePath) return null;
+
+  const sourceBuffer = await readStorageFile(template.sourcePath);
+  if (!sourceBuffer) return null;
+
+  const fullRaster = await rasterizeTemplate(sourceBuffer, "pdf");
+  const fullMeta = await sharp(fullRaster).metadata();
+  const fullWidth = fullMeta.width ?? 0;
+  const fullHeight = fullMeta.height ?? 0;
+  if (fullWidth <= 0 || fullHeight <= 0) return null;
+
+  const currentBuffer = await readStorageFile(template.filePath);
+  if (!currentBuffer) return null;
+  const currentMeta = await sharp(currentBuffer).metadata();
+  const currentWidth = currentMeta.width ?? 0;
+  const currentHeight = currentMeta.height ?? 0;
+
+  if (currentWidth === fullWidth && currentHeight === fullHeight) {
+    return { width: fullWidth, height: fullHeight, repaired: false, layoutJson: template.layoutJson };
+  }
+
+  await saveFile(template.filePath, fullRaster);
+
+  const fromW = template.sourceWidth ?? currentWidth;
+  const fromH = template.sourceHeight ?? currentHeight;
+  let layoutJson = template.layoutJson;
+  if (layoutJson != null && fromW > 0 && fromH > 0) {
+    layoutJson = remapLayoutDimensions(
+      layoutJson as TemplateLayoutDto,
+      fromW,
+      fromH,
+      fullWidth,
+      fullHeight,
+    );
+    parseTemplateLayoutJson(layoutJson);
+  }
+
+  await prisma.idCardTemplate.update({
+    where: { id: template.id },
+    data: {
+      sourceWidth: fullWidth,
+      sourceHeight: fullHeight,
+      ...(layoutJson != null ? { layoutJson } : {}),
+    },
+  });
+
+  return { width: fullWidth, height: fullHeight, repaired: true, layoutJson };
+}
+
 async function readRenderedTemplateDimensions(
   filePath: string,
   options?: { sourcePath?: string | null; sourceFormat?: string | null },
@@ -185,21 +245,33 @@ export async function getTemplateById(id: string) {
   });
   if (!template) throw new NotFoundError("Template not found");
 
-  const dimensions = await readRenderedTemplateDimensions(template.filePath, {
-    sourcePath: template.sourcePath,
-    sourceFormat: template.sourceFormat,
-  });
+  const repaired = await ensureFullPageTemplateRaster(template);
+  const dimensions = repaired
+    ? { width: repaired.width, height: repaired.height }
+    : await readRenderedTemplateDimensions(template.filePath, {
+        sourcePath: template.sourcePath,
+        sourceFormat: template.sourceFormat,
+      });
+
+  const effectiveLayoutJson = repaired?.layoutJson ?? template.layoutJson;
   const layoutJson = normalizeLayoutForPrintFile(
-    template.layoutJson,
+    effectiveLayoutJson,
     dimensions.width,
     dimensions.height,
-    template.sourceWidth,
-    template.sourceHeight,
+    dimensions.width,
+    dimensions.height,
   );
 
   return {
-    ...mapTemplate({ ...template, layoutJson: layoutJson ?? template.layoutJson }),
+    ...mapTemplate({
+      ...template,
+      layoutJson: layoutJson ?? effectiveLayoutJson,
+      sourceWidth: dimensions.width,
+      sourceHeight: dimensions.height,
+      updatedAt: repaired?.repaired ? new Date() : template.updatedAt,
+    }),
     dimensions,
+    layoutRepaired: repaired?.repaired ?? false,
   };
 }
 

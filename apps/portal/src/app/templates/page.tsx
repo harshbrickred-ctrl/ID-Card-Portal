@@ -176,7 +176,7 @@ export default function TemplatesPage() {
 
   const progressHint =
     uploadProgress?.phase === "processing" && isPdfUpload
-      ? "Rendering page 1 at CR-80 size (1011×638 px). Keep this tab open."
+      ? "Rendering page 1 at 300 DPI. Keep this tab open."
       : uploadProgress?.phase === "uploading"
         ? "Sending your file to the server."
         : "Almost done.";
@@ -323,7 +323,7 @@ export default function TemplatesPage() {
                   required
                 />
                 <p className={styles.formHint}>
-                  PDF is converted on the server at CR-80 (1011×638 px). PNG and JPG also work.
+                  PDF page 1 is rasterized at 300 DPI at its native size. PNG and JPG keep their original dimensions.
                 </p>
                 {file ? <p className={styles.formHint}>Selected: {file.name}</p> : null}
               </div>
@@ -357,7 +357,7 @@ export default function TemplatesPage() {
               <div className={styles.tipsBox}>
                 <p className={styles.tipsTitle}>Exporting from CorelDRAW</p>
                 <ul className="space-y-1">
-                  <li>Page size: 85.6×53.98 mm (CR-80).</li>
+                  <li>Any page size works — CR-80 (85.6×53.98 mm) is common but not required.</li>
                   <li>Export PDF at 300 DPI, then upload here.</li>
                   <li>Signature is reused on every card; student fields are filled at print.</li>
                 </ul>
