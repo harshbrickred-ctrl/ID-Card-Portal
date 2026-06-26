@@ -39,7 +39,6 @@ export default function TemplatesPage() {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [signature, setSignature] = useState<File | null>(null);
-  const [layoutFile, setLayoutFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     phase: UploadProgressPhase;
@@ -49,8 +48,6 @@ export default function TemplatesPage() {
   const [loadError, setLoadError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  const isPdfUpload = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
   async function load() {
     setLoadError("");
@@ -142,19 +139,15 @@ export default function TemplatesPage() {
       fd.append("name", name || "School ID Template");
       fd.append("file", file);
       if (signature) fd.append("signature", signature);
-      if (layoutFile) fd.append("layout", layoutFile);
-      const result = await apiUploadFormData<{ layoutWarning?: string | null }>("/v1/templates", fd, (phase, percent) => {
+      const result = await apiUploadFormData("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
       });
       setBanner({
-        type: result.layoutWarning ? "error" : "success",
-        text: result.layoutWarning
-          ? `Template uploaded with warning: ${result.layoutWarning}`
-          : "Template uploaded. Open Edit layout to align fields on the card.",
+        type: "success",
+        text: "Template uploaded. Open Edit layout to place photo, signature, and student fields on the card.",
       });
       setFile(null);
       setSignature(null);
-      setLayoutFile(null);
       setName("");
       await load();
     } catch (err) {
@@ -168,17 +161,15 @@ export default function TemplatesPage() {
   const progressLabel =
     uploadProgress?.phase === "uploading"
       ? `Uploading template… ${uploadProgress.percent}%`
-      : uploadProgress?.phase === "processing" && isPdfUpload
-        ? "Converting PDF to print-ready image…"
-        : uploadProgress?.phase === "processing"
-          ? "Processing template…"
-          : "Finishing up…";
+      : uploadProgress?.phase === "processing"
+        ? "Processing template…"
+        : "Finishing up…";
 
   const progressHint =
-    uploadProgress?.phase === "processing" && isPdfUpload
-      ? "Rendering page 1 at 300 DPI. Keep this tab open."
-      : uploadProgress?.phase === "uploading"
-        ? "Sending your file to the server."
+    uploadProgress?.phase === "uploading"
+      ? "Sending your image to the server."
+      : uploadProgress?.phase === "processing"
+        ? "Preparing your layout image."
         : "Almost done.";
 
   return (
@@ -312,34 +303,24 @@ export default function TemplatesPage() {
               </div>
               <div>
                 <label className={styles.formLabel} htmlFor="template-file">
-                  ID card file (PDF recommended)
+                  ID card layout image (PNG or JPG)
                 </label>
                 <input
                   id="template-file"
                   className={`${styles.formInput} ${styles.fileInput}`}
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   required
                 />
                 <p className={styles.formHint}>
-                  PDF page 1 is rasterized at 300 DPI at its native size. PNG and JPG keep their original dimensions.
+                  Upload the finished card design as PNG or JPG. Use the exact print size (e.g. CR-80 at 300 DPI:
+                  1011×638 px) so field positions match on screen and when printing.
                 </p>
                 {file ? <p className={styles.formHint}>Selected: {file.name}</p> : null}
-              </div>
-              <div>
-                <label className={styles.formLabel} htmlFor="template-layout">
-                  Layout JSON (optional)
-                </label>
-                <input
-                  id="template-layout"
-                  className={`${styles.formInput} ${styles.fileInput}`}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={(e) => setLayoutFile(e.target.files?.[0] ?? null)}
-                />
                 <p className={styles.formHint}>
-                  Or use <strong>Edit layout</strong> after upload to drag fields into place — no JSON needed.
+                  After upload, open <strong>Edit layout</strong> to place photo, signature, and student fields on
+                  the card.
                 </p>
               </div>
               <div>
@@ -355,10 +336,11 @@ export default function TemplatesPage() {
                 />
               </div>
               <div className={styles.tipsBox}>
-                <p className={styles.tipsTitle}>Exporting from CorelDRAW</p>
+                <p className={styles.tipsTitle}>Exporting from CorelDRAW / Canva</p>
                 <ul className="space-y-1">
-                  <li>Any page size works — CR-80 (85.6×53.98 mm) is common but not required.</li>
-                  <li>Export PDF at 300 DPI, then upload here.</li>
+                  <li>Export as <strong>PNG</strong> or <strong>JPG</strong> at 300 DPI (not PDF).</li>
+                  <li>CR-80 size: 85.6×53.98 mm (≈ 1011×638 px) — match your physical card.</li>
+                  <li>After upload, use <strong>Edit layout</strong> to drag fields into place (no JSON file needed).</li>
                   <li>Signature is reused on every card; student fields are filled at print.</li>
                 </ul>
               </div>
@@ -378,8 +360,8 @@ export default function TemplatesPage() {
             {visibleTemplates.length === 0 ? (
               <p className={styles.empty}>
                 {selectedSchool
-                  ? `No template for ${selectedSchool.name} yet. Upload a PDF or PNG on the left.`
-                  : "Select a school, then upload a PDF or PNG to start printing ID cards."}
+                  ? `No template for ${selectedSchool.name} yet. Upload a PNG or JPG on the left.`
+                  : "Select a school, then upload a PNG or JPG to start printing ID cards."}
               </p>
             ) : (
               <div

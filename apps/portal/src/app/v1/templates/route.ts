@@ -21,7 +21,6 @@ export const POST = withApi(async (req) => {
   const name = form.get("name");
   const file = form.get("file");
   const signature = form.get("signature");
-  const layoutFile = form.get("layout");
 
   if (typeof schoolId !== "string") throw new BadRequestError("schoolId is required");
   if (typeof name !== "string" || !name.trim()) throw new BadRequestError("Template name is required");
@@ -38,17 +37,7 @@ export const POST = withApi(async (req) => {
     };
   }
 
-  let layoutJson: unknown;
-  if (layoutFile instanceof File && layoutFile.size > 0) {
-    try {
-      layoutJson = JSON.parse(await layoutFile.text());
-    } catch {
-      throw new BadRequestError("Layout file must be valid JSON (.layout.json)");
-    }
-  }
-
   return templateService.uploadTemplate(schoolId, name.trim(), buffer, format, {
     signature: signatureInput,
-    layoutJson,
   });
 });

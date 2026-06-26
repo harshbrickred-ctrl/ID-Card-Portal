@@ -5,6 +5,7 @@ import { resolveCardDimensions, scaleFromCr80, type CardDimensions } from "./dim
 import {
   DEFAULT_TEMPLATE_LAYOUT,
   DEFAULT_FIELD_LABELS,
+  scaleTemplateLayout,
   type TemplateFieldKey,
   type TemplateLayout,
   type TemplatePhotoShape,
@@ -223,6 +224,18 @@ async function prepareTemplateBackground(templateBuffer: Buffer): Promise<Buffer
   return sharp(templateBuffer).png().toBuffer();
 }
 
+/** Map saved layout coords onto the actual template raster pixel grid. */
+function alignLayoutToImage(layout: TemplateLayout, imageWidth: number, imageHeight: number): TemplateLayout {
+  const fromW = layout.sourceWidth ?? CARD_WIDTH;
+  const fromH = layout.sourceHeight ?? CARD_HEIGHT;
+  const scaled = scaleTemplateLayout(
+    { ...layout, sourceWidth: fromW, sourceHeight: fromH },
+    imageWidth,
+    imageHeight,
+  );
+  return { ...scaled, sourceWidth: imageWidth, sourceHeight: imageHeight };
+}
+
 export function validateStudentCard(student: RenderStudentCardInput["student"]): string[] {
   const errors: string[] = [];
   if (!student.name?.trim()) errors.push("Name is required");
@@ -237,33 +250,49 @@ export async function renderStudentCard(input: RenderStudentCardInput): Promise<
   const { student, school, templateBuffer, signatureBuffer } = input;
   const layout = input.layout ?? DEFAULT_TEMPLATE_LAYOUT;
   const accent = school.accentColor || "#6366f1";
-  const dims = await resolveCardDimensions(layout, templateBuffer);
 
   const base =
     templateBuffer && templateBuffer.length > 0
       ? await prepareTemplateBackground(templateBuffer)
-      : await defaultTemplate(accent, school.name, dims);
+      : await defaultTemplate(
+          accent,
+          school.name,
+          await resolveCardDimensions(layout, templateBuffer),
+        );
+
+  const baseMeta = await sharp(base).metadata();
+  const canvasW = baseMeta.width ?? CARD_WIDTH;
+  const canvasH = baseMeta.height ?? CARD_HEIGHT;
+  const renderLayout = alignLayoutToImage(layout, canvasW, canvasH);
 
   const photo = await photoRect(
     student.photoBuffer,
-    layout.photo.width,
-    layout.photo.height,
-    layout.photoShape ?? "rectangle",
+    renderLayout.photo.width,
+    renderLayout.photo.height,
+    renderLayout.photoShape ?? "rectangle",
   );
-  const signature = await signatureRect(signatureBuffer, layout.signature.width, layout.signature.height);
+  const signature = await signatureRect(
+    signatureBuffer,
+    renderLayout.signature.width,
+    renderLayout.signature.height,
+  );
 
   const textSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${dims.width}" height="${dims.height}" xmlns="http://www.w3.org/2000/svg">
-  ${layout.fields.map((field) => renderFieldSvg(field, student, school)).join("")}
-  ${photoFrameSvg(layout, accent)}
+<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">
+  ${renderLayout.fields.map((field) => renderFieldSvg(field, student, school)).join("")}
+  ${photoFrameSvg(renderLayout, accent)}
 </svg>`;
 
   const composites: sharp.OverlayOptions[] = [];
   if (photo) {
-    composites.push({ input: photo, top: layout.photo.y, left: layout.photo.x });
+    composites.push({ input: photo, top: renderLayout.photo.y, left: renderLayout.photo.x });
   }
   if (signature) {
-    composites.push({ input: signature, top: layout.signature.y, left: layout.signature.x });
+    composites.push({
+      input: signature,
+      top: renderLayout.signature.y,
+      left: renderLayout.signature.x,
+    });
   }
   composites.push({ input: Buffer.from(textSvg), top: 0, left: 0 });
 

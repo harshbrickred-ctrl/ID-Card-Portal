@@ -101,7 +101,7 @@ async function readRenderedTemplateDimensions(
   }
 
   throw new BadRequestError(
-    "Template preview image is invalid. Delete this template and upload the PDF again.",
+    "Template preview image is invalid. Delete this template and upload a PNG or JPG again.",
   );
 }
 function mapTemplate(t: {
@@ -146,7 +146,6 @@ export async function uploadTemplate(
   format: TemplateSourceFormat,
   options?: {
     signature?: { buffer: Buffer; ext: string } | null;
-    layoutJson?: unknown;
   },
 ) {
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
@@ -158,12 +157,6 @@ export async function uploadTemplate(
     const sourceMeta = await sharp(buffer).metadata();
     uploadWidth = sourceMeta.width ?? null;
     uploadHeight = sourceMeta.height ?? null;
-  }
-
-  let layoutJson: unknown = null;
-  if (options?.layoutJson != null) {
-    layoutJson = options.layoutJson;
-    parseTemplateLayoutJson(layoutJson);
   }
 
   const existing = await prisma.idCardTemplate.findUnique({ where: { schoolId } });
@@ -181,13 +174,6 @@ export async function uploadTemplate(
   const sourceWidth = rasterMeta.width ?? uploadWidth;
   const sourceHeight = rasterMeta.height ?? uploadHeight;
 
-  if (layoutJson != null && sourceWidth && sourceHeight) {
-    const raw = layoutJson as TemplateLayoutDto;
-    const fromW = raw.sourceWidth ?? uploadWidth ?? sourceWidth;
-    const fromH = raw.sourceHeight ?? uploadHeight ?? sourceHeight;
-    layoutJson = remapLayoutDimensions(raw, fromW, fromH, sourceWidth, sourceHeight);
-    parseTemplateLayoutJson(layoutJson);
-  }
   const renderPath = `templates/${schoolId}/template.png`;
   if (existing?.filePath) await deleteStorageFile(existing.filePath);
   const stored = await saveFile(renderPath, rasterBuffer);
@@ -212,7 +198,6 @@ export async function uploadTemplate(
       sourcePath: sourcePathStored,
       sourceFormat: isRasterTemplateFormat(format) ? null : format,
       signaturePath: signaturePath ?? null,
-      layoutJson: layoutJson ?? undefined,
       sourceWidth,
       sourceHeight,
     },
@@ -222,20 +207,13 @@ export async function uploadTemplate(
       sourcePath: sourcePathStored,
       sourceFormat: isRasterTemplateFormat(format) ? null : format,
       ...(signaturePath ? { signaturePath } : {}),
-      ...(layoutJson != null ? { layoutJson } : {}),
       sourceWidth,
       sourceHeight,
     },
     include: { school: true },
   });
 
-  return {
-    ...mapTemplate(template),
-    layoutWarning:
-      layoutJson == null
-        ? "No field layout yet — open Edit layout after upload to drag fields into place."
-        : null,
-  };
+  return mapTemplate(template);
 }
 
 export async function getTemplateById(id: string) {
@@ -422,23 +400,31 @@ export async function getTemplateForSchool(schoolId: string) {
 export async function loadTemplateAssets(schoolId: string) {
   const template = await prisma.idCardTemplate.findUnique({ where: { schoolId } });
   if (!template) {
-    return { templateBuffer: null, signatureBuffer: null, hasTemplate: false, layout: null };
+    return { templateBuffer: null, signatureBuffer: null, hasTemplate: false, layout: null, layoutInvalid: false };
   }
+
+  const repaired = await ensureFullPageTemplateRaster(template);
 
   const [templateBuffer, signatureBuffer] = await Promise.all([
     readStorageFile(template.filePath),
     template.signaturePath ? readStorageFile(template.signaturePath) : Promise.resolve(null),
   ]);
 
-  let layout = null;
-  if (template.layoutJson) {
-    try {
-      const printDims = await readRenderedTemplateDimensions(template.filePath, {
+  const printDims = repaired
+    ? { width: repaired.width, height: repaired.height }
+    : await readRenderedTemplateDimensions(template.filePath, {
         sourcePath: template.sourcePath,
         sourceFormat: template.sourceFormat,
       });
+
+  const layoutJson = repaired?.layoutJson ?? template.layoutJson;
+
+  let layout = null;
+  let layoutInvalid = false;
+  if (layoutJson) {
+    try {
       const normalized = normalizeLayoutForPrintFile(
-        template.layoutJson,
+        layoutJson,
         printDims.width,
         printDims.height,
         template.sourceWidth,
@@ -447,12 +433,14 @@ export async function loadTemplateAssets(schoolId: string) {
       if (normalized) {
         layout = parseTemplateLayoutJson(normalized);
       }
-    } catch {
+    } catch (err) {
+      console.error("[loadTemplateAssets] Invalid layout JSON:", err);
+      layoutInvalid = true;
       layout = null;
     }
   }
 
-  return { templateBuffer, signatureBuffer, hasTemplate: true, layout };
+  return { templateBuffer, signatureBuffer, hasTemplate: true, layout, layoutInvalid };
 }
 
 export async function loadTemplateBuffer(schoolId: string) {

@@ -113,7 +113,7 @@ export async function previewCards(
 ) {
   const { school, students } = await loadPrintBatch(schoolId, studentIds, filters);
 
-  const { templateBuffer, signatureBuffer, hasTemplate, layout } =
+  const { templateBuffer, signatureBuffer, hasTemplate, layout, layoutInvalid } =
     await loadTemplateAssets(schoolId);
 
   const schoolData = {
@@ -124,6 +124,9 @@ export async function previewCards(
   };
 
   const layoutReady = !hasTemplate || Boolean(layout);
+  const layoutError = layoutInvalid
+    ? "Saved layout is invalid — open Templates → Edit layout and save again"
+    : null;
 
   const previews = await Promise.all(
     students.map(async (s) => {
@@ -131,6 +134,9 @@ export async function previewCards(
       const errors = validateStudentCard(cardStudent);
       if (!layoutReady) {
         errors.push("Field layout not configured — open Templates → Edit layout");
+      }
+      if (layoutError) {
+        errors.push(layoutError);
       }
       const hasErrors = errors.some((e) => BLOCKING_ERRORS.has(e)) || !layoutReady;
 
