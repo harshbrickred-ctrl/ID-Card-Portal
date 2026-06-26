@@ -1,9 +1,14 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
-import { resolveCardDimensions, scaleFromCr80 } from "./dimensions";
-import { DEFAULT_TEMPLATE_LAYOUT, DEFAULT_FIELD_LABELS, type TemplateFieldKey, type TemplateLayout } from "./layout";
-import type { CardDimensions } from "./dimensions";
+import { resolveCardDimensions, scaleFromCr80, type CardDimensions } from "./dimensions";
+import {
+  DEFAULT_TEMPLATE_LAYOUT,
+  DEFAULT_FIELD_LABELS,
+  type TemplateFieldKey,
+  type TemplateLayout,
+  type TemplatePhotoShape,
+} from "./layout";
 import type { RenderStudentCardInput } from "./types";
 
 function esc(s: string): string {
@@ -49,9 +54,7 @@ function fieldValue(
     case "enrollId":
       return student.enrollId;
     case "classSection":
-      return labeled
-        ? `${student.class} - ${student.section}`
-        : `Class ${student.class} - ${student.section}`;
+      return `${student.class} - ${student.section}`;
     case "dob":
       return student.dob?.trim() || "—";
     case "phone":
@@ -142,14 +145,48 @@ function renderFieldSvg(
   return parts.join("");
 }
 
-async function photoRect(buf: Buffer | null | undefined, w: number, h: number): Promise<Buffer | null> {
+async function photoRect(
+  buf: Buffer | null | undefined,
+  w: number,
+  h: number,
+  shape: TemplatePhotoShape = "rectangle",
+): Promise<Buffer | null> {
   if (!buf) return null;
-  return sharp(buf).resize(w, h, { fit: "cover" }).png().toBuffer();
+  const resized = await sharp(buf).resize(w, h, { fit: "cover" }).png().toBuffer();
+  if (shape === "rectangle") return resized;
+
+  const radiusX = shape === "circle" ? Math.min(w, h) / 2 : w / 2;
+  const radiusY = shape === "circle" ? Math.min(w, h) / 2 : h / 2;
+  const cx = w / 2;
+  const cy = h / 2;
+  const maskSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="${cx}" cy="${cy}" rx="${radiusX}" ry="${radiusY}" fill="white"/>
+</svg>`;
+
+  return sharp(resized)
+    .composite([{ input: Buffer.from(maskSvg), blend: "dest-in" }])
+    .png()
+    .toBuffer();
 }
 
 async function signatureRect(buf: Buffer | null | undefined, w: number, h: number): Promise<Buffer | null> {
   if (!buf) return null;
   return sharp(buf).resize(w, h, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+}
+
+function photoFrameSvg(layout: TemplateLayout, accent: string): string {
+  if (layout.photoBorder !== true) return "";
+
+  const { x, y, width, height } = layout.photo;
+  const shape = layout.photoShape ?? "rectangle";
+  if (shape === "circle" || shape === "ellipse") {
+    const rx = shape === "circle" ? Math.min(width, height) / 2 : width / 2;
+    const ry = shape === "circle" ? Math.min(width, height) / 2 : height / 2;
+    return `<ellipse cx="${x + width / 2}" cy="${y + height / 2}" rx="${rx}" ry="${ry}" fill="none" stroke="${accent}" stroke-width="2"/>`;
+  }
+
+  return `<rect x="${x - 4}" y="${y - 4}" width="${width + 8}" height="${height + 8}" rx="12" fill="none" stroke="${accent}" stroke-width="2"/>`;
 }
 
 async function defaultTemplate(accent: string, schoolName: string, dims: CardDimensions): Promise<Buffer> {
@@ -207,27 +244,28 @@ export async function renderStudentCard(input: RenderStudentCardInput): Promise<
       ? await prepareTemplateBackground(templateBuffer)
       : await defaultTemplate(accent, school.name, dims);
 
-  const photo = await photoRect(student.photoBuffer, layout.photo.width, layout.photo.height);
+  const photo = await photoRect(
+    student.photoBuffer,
+    layout.photo.width,
+    layout.photo.height,
+    layout.photoShape ?? "rectangle",
+  );
   const signature = await signatureRect(signatureBuffer, layout.signature.width, layout.signature.height);
-
-  const photoFrame =
-    layout.photoBorder !== false
-      ? `<rect x="${layout.photo.x - 4}" y="${layout.photo.y - 4}" width="${layout.photo.width + 8}" height="${layout.photo.height + 8}" rx="12" fill="none" stroke="${accent}" stroke-width="2"/>`
-      : "";
 
   const textSvg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${dims.width}" height="${dims.height}" xmlns="http://www.w3.org/2000/svg">
   ${layout.fields.map((field) => renderFieldSvg(field, student, school)).join("")}
-  ${photoFrame}
+  ${photoFrameSvg(layout, accent)}
 </svg>`;
 
-  const composites: sharp.OverlayOptions[] = [{ input: Buffer.from(textSvg), top: 0, left: 0 }];
+  const composites: sharp.OverlayOptions[] = [];
   if (photo) {
     composites.push({ input: photo, top: layout.photo.y, left: layout.photo.x });
   }
   if (signature) {
     composites.push({ input: signature, top: layout.signature.y, left: layout.signature.x });
   }
+  composites.push({ input: Buffer.from(textSvg), top: 0, left: 0 });
 
   return sharp(base).composite(composites).png().toBuffer();
 }

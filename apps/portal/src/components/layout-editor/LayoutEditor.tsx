@@ -22,15 +22,33 @@ const EDITOR_FIELDS: TemplateFieldKeyDto[] = [
 
 const FIELD_LABELS = DEFAULT_FIELD_LABELS;
 
+const SAMPLE_VALUES: Record<TemplateFieldKeyDto, string> = {
+  name: "Sample Name",
+  firstName: "Sample",
+  lastName: "Name",
+  enrollId: "ENR-2026-001",
+  classSection: "10 - A",
+  dob: "2010-05-12",
+  phone: "9876543210",
+  address: "12 MG Road, Mumbai",
+  academicYear: "2026-2027",
+};
+
+type ResizeCorner = "se";
+
 type Selection = "photo" | "signature" | TemplateFieldKeyDto | "label";
 
 type DragState = {
   target: Selection;
+  mode: "move" | "resize";
+  corner?: ResizeCorner;
   fieldKey?: TemplateFieldKeyDto;
   startX: number;
   startY: number;
   originX: number;
   originY: number;
+  originW?: number;
+  originH?: number;
 };
 
 export type LayoutEditorTemplate = {
@@ -48,6 +66,19 @@ export type LayoutEditorTemplate = {
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+function photoRegionRadius(shape: TemplateLayoutDto["photoShape"], scale: number) {
+  if (shape === "circle") return "50%";
+  if (shape === "ellipse") return "50% / 50%";
+  return `${Math.round(6 * scale)}px`;
+}
+
+function sampleFieldText(field: TemplateLayoutDto["fields"][number]) {
+  if (field.showLabel) {
+    return `${field.label ?? FIELD_LABELS[field.key]} : ${SAMPLE_VALUES[field.key]}`;
+  }
+  return SAMPLE_VALUES[field.key];
 }
 
 function defaultLabelPosition(field: TemplateLayoutDto["fields"][number], sourceWidth: number) {
@@ -174,10 +205,25 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
     function onMove(e: PointerEvent) {
       const dx = (e.clientX - activeDrag.startX) / scale;
       const dy = (e.clientY - activeDrag.startY) / scale;
-      const x = Math.round(activeDrag.originX + dx);
-      const y = Math.round(activeDrag.originY + dy);
 
       setLayout((prev) => {
+        if (activeDrag.mode === "resize" && (activeDrag.target === "photo" || activeDrag.target === "signature")) {
+          const region = activeDrag.target === "photo" ? prev.photo : prev.signature;
+          const minSize = 24;
+          const width = clamp(Math.round((activeDrag.originW ?? region.width) + dx), minSize, sourceWidth - region.x);
+          const height = clamp(
+            Math.round((activeDrag.originH ?? region.height) + dy),
+            minSize,
+            sourceHeight - region.y,
+          );
+          return activeDrag.target === "photo"
+            ? { ...prev, photo: { ...prev.photo, width, height } }
+            : { ...prev, signature: { ...prev.signature, width, height } };
+        }
+
+        const x = Math.round(activeDrag.originX + dx);
+        const y = Math.round(activeDrag.originY + dy);
+
         if (activeDrag.target === "photo") {
           return {
             ...prev,
@@ -238,11 +284,34 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
     setSelected(fieldKey ?? target);
     setDrag({
       target,
+      mode: "move",
       fieldKey,
       startX: e.clientX,
       startY: e.clientY,
       originX,
       originY,
+    });
+  }
+
+  function startResize(
+    e: React.PointerEvent,
+    target: "photo" | "signature",
+    width: number,
+    height: number,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelected(target);
+    setDrag({
+      target,
+      mode: "resize",
+      corner: "se",
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: 0,
+      originY: 0,
+      originW: width,
+      originH: height,
     });
   }
 
@@ -268,7 +337,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
             y,
             fontSize: 22,
             maxWidth: Math.round(sourceWidth * 0.35),
-            showLabel: true,
+            showLabel: false,
             labelX: Math.round(sourceWidth * 0.4),
             labelY: y,
             dominantBaseline: "middle" as const,
@@ -379,10 +448,19 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                   top: layout.photo.y * scale,
                   width: layout.photo.width * scale,
                   height: layout.photo.height * scale,
+                  borderRadius: photoRegionRadius(layout.photoShape, scale),
                 }}
                 onPointerDown={(e) => startDrag(e, "photo", layout.photo.x, layout.photo.y)}
               >
                 <span className={styles.regionLabel}>Photo</span>
+                {selected === "photo" ? (
+                  <span
+                    className={styles.resizeHandle}
+                    onPointerDown={(e) =>
+                      startResize(e, "photo", layout.photo.width, layout.photo.height)
+                    }
+                  />
+                ) : null}
               </div>
 
               <div
@@ -396,6 +474,14 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                 onPointerDown={(e) => startDrag(e, "signature", layout.signature.x, layout.signature.y)}
               >
                 <span className={styles.regionLabel}>Signature</span>
+                {selected === "signature" ? (
+                  <span
+                    className={styles.resizeHandle}
+                    onPointerDown={(e) =>
+                      startResize(e, "signature", layout.signature.width, layout.signature.height)
+                    }
+                  />
+                ) : null}
               </div>
 
               {layout.fields.map((field) => {
@@ -404,6 +490,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                 const showLabelMarker = Boolean(field.showLabel);
                 const labelX = field.labelX ?? defaultLabelPosition(field, sourceWidth).labelX;
                 const labelY = field.labelY ?? field.y;
+                const previewSize = Math.max(10, Math.round(field.fontSize * scale));
                 return (
                   <div key={field.key}>
                     {showLabelMarker ? (
@@ -416,6 +503,18 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                         L
                       </div>
                     ) : null}
+                    <div
+                      className={`${styles.fieldPreview} ${isSelected ? styles.fieldPreviewSelected : ""}`}
+                      style={{
+                        left: field.x * scale,
+                        top: field.y * scale,
+                        fontSize: previewSize,
+                        color: field.fill ?? "#0f172a",
+                        maxWidth: field.maxWidth ? field.maxWidth * scale : undefined,
+                      }}
+                    >
+                      {sampleFieldText(field)}
+                    </div>
                     <div
                       className={`${styles.marker} ${isSelected ? styles.markerSelected : ""}`}
                       style={{ left: field.x * scale, top: field.y * scale }}
@@ -446,8 +545,8 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
           </div>
 
           <p className={styles.hint}>
-            Drag <strong>teal dots</strong> for values and <strong>purple L</strong> for labels directly on the
-            template preview.
+            Drag sample text into place. Turn <strong>Show label</strong> off when your template artwork already
+            prints labels like &quot;Enroll No :&quot;.
           </p>
 
           <p className={styles.sectionLabel}>Elements</p>
@@ -509,7 +608,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                         });
                       }}
                     />
-                    Show label (Name :, Class :, …)
+                    Show label (Name :, Class :, …) — off when template already has labels
                   </label>
                   <div>
                     <label className={styles.formLabel} htmlFor="field-font-size">
@@ -531,7 +630,42 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
               ) : null}
 
               {selected === "photo" || selected === "signature" ? (
-                <div className={styles.numberGrid}>
+                <div className="space-y-3">
+                  {selected === "photo" ? (
+                    <>
+                      <div>
+                        <label className={styles.formLabel} htmlFor="photo-shape">
+                          Photo frame shape
+                        </label>
+                        <select
+                          id="photo-shape"
+                          className={styles.formInput}
+                          value={layout.photoShape ?? "rectangle"}
+                          onChange={(e) =>
+                            setLayout((prev) => ({
+                              ...prev,
+                              photoShape: e.target.value as TemplateLayoutDto["photoShape"],
+                            }))
+                          }
+                        >
+                          <option value="rectangle">Rectangle / square</option>
+                          <option value="circle">Circle</option>
+                          <option value="ellipse">Oval</option>
+                        </select>
+                      </div>
+                      <label className={styles.checkboxRow}>
+                        <input
+                          type="checkbox"
+                          checked={layout.photoBorder === true}
+                          onChange={(e) =>
+                            setLayout((prev) => ({ ...prev, photoBorder: e.target.checked }))
+                          }
+                        />
+                        Draw photo border on print (off when template already has a frame)
+                      </label>
+                    </>
+                  ) : null}
+                  <div className={styles.numberGrid}>
                   <div>
                     <label className={styles.formLabel} htmlFor="region-width">
                       Width
@@ -572,6 +706,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                       }}
                     />
                   </div>
+                </div>
                 </div>
               ) : null}
             </div>

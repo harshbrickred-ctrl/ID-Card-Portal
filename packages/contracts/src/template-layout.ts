@@ -34,6 +34,8 @@ export const TemplateFieldLayoutSchema = z.object({
   labelFill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
+export const TemplatePhotoShapeSchema = z.enum(["rectangle", "circle", "ellipse"]);
+
 export const TemplateLayoutSchema = z.object({
   photo: z.object({
     x: z.number().finite(),
@@ -48,6 +50,8 @@ export const TemplateLayoutSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
   }),
+  /** Clip student photo to rectangle, circle, or ellipse to match the template frame. */
+  photoShape: TemplatePhotoShapeSchema.optional(),
   photoBorder: z.boolean().optional(),
   sourceWidth: z.number().positive().optional(),
   sourceHeight: z.number().positive().optional(),
@@ -80,14 +84,15 @@ export const DEFAULT_FIELD_LABELS: Record<TemplateFieldKeyDto, string> = {
 };
 
 const DEFAULT_CR80_LAYOUT: TemplateLayoutDto = {
-  photoBorder: true,
+  photoBorder: false,
+  photoShape: "rectangle",
   photo: { x: 50, y: 150, width: 200, height: 250 },
   fields: [
-    { key: "name", x: 380, y: 180, fontSize: 32, bold: true, maxWidth: 600, showLabel: true, labelX: 280 },
-    { key: "enrollId", x: 380, y: 235, fontSize: 22, maxWidth: 600, showLabel: true, labelX: 280 },
-    { key: "classSection", x: 380, y: 280, fontSize: 20, maxWidth: 600, showLabel: true, labelX: 280 },
-    { key: "dob", x: 380, y: 325, fontSize: 20, maxWidth: 600, showLabel: true, labelX: 280 },
-    { key: "phone", x: 380, y: 370, fontSize: 18, maxWidth: 600, showLabel: true, labelX: 280 },
+    { key: "name", x: 380, y: 180, fontSize: 32, bold: true, maxWidth: 600, showLabel: false, labelX: 280 },
+    { key: "enrollId", x: 380, y: 235, fontSize: 22, maxWidth: 600, showLabel: false, labelX: 280 },
+    { key: "classSection", x: 380, y: 280, fontSize: 20, maxWidth: 600, showLabel: false, labelX: 280 },
+    { key: "dob", x: 380, y: 325, fontSize: 20, maxWidth: 600, showLabel: false, labelX: 280 },
+    { key: "phone", x: 380, y: 370, fontSize: 18, maxWidth: 600, showLabel: false, labelX: 280 },
     {
       key: "address",
       x: 380,
@@ -95,7 +100,7 @@ const DEFAULT_CR80_LAYOUT: TemplateLayoutDto = {
       fontSize: 16,
       maxWidth: 600,
       lineHeight: 22,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
   ],
@@ -117,6 +122,7 @@ export function createDefaultLayoutForSource(sourceWidth: number, sourceHeight: 
     sourceWidth,
     sourceHeight,
     photoBorder: base.photoBorder,
+    photoShape: base.photoShape,
     photo: {
       x: scaleLayoutNum(base.photo.x, sx),
       y: scaleLayoutNum(base.photo.y, sy),

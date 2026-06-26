@@ -44,11 +44,15 @@ export const DEFAULT_FIELD_LABELS: Record<TemplateFieldKey, string> = {
   academicYear: "Session",
 };
 
+export type TemplatePhotoShape = "rectangle" | "circle" | "ellipse";
+
 export type TemplateLayout = {
   photo: { x: number; y: number; width: number; height: number };
   fields: TemplateFieldLayout[];
   signature: { x: number; y: number; width: number; height: number };
-  /** When false, skip the decorative photo frame drawn by the renderer. */
+  /** Clip student photo to match the template frame. */
+  photoShape?: TemplatePhotoShape;
+  /** When true, draws a decorative frame around the photo (usually off when the artwork already has one). */
   photoBorder?: boolean;
   /** Layout coords are in this design size; scaled to CR-80 at render time. */
   sourceWidth?: number;
@@ -72,7 +76,9 @@ export function scaleTemplateLayout(
   const sy = targetHeight / layout.sourceHeight;
 
   return {
+    ...layout,
     photoBorder: layout.photoBorder,
+    photoShape: layout.photoShape,
     photo: {
       x: scaleNum(layout.photo.x, sx),
       y: scaleNum(layout.photo.y, sy),
@@ -102,7 +108,8 @@ export function scaleTemplateLayout(
 }
 
 export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
-  photoBorder: true,
+  photoBorder: false,
+  photoShape: "rectangle",
   photo: { x: 50, y: 150, width: 200, height: 250 },
   fields: [
     {
@@ -112,7 +119,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       fontSize: 32,
       bold: true,
       maxWidth: 600,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
     {
@@ -121,7 +128,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       y: 235,
       fontSize: 22,
       maxWidth: 600,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
     {
@@ -130,7 +137,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       y: 280,
       fontSize: 20,
       maxWidth: 600,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
     {
@@ -139,7 +146,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       y: 325,
       fontSize: 20,
       maxWidth: 600,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
     {
@@ -148,7 +155,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       y: 370,
       fontSize: 18,
       maxWidth: 600,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
     {
@@ -158,7 +165,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       fontSize: 16,
       maxWidth: 600,
       lineHeight: 22,
-      showLabel: true,
+      showLabel: false,
       labelX: 280,
     },
   ],
