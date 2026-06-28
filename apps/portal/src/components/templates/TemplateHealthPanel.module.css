@@ -1,0 +1,168 @@
+.panel {
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  padding: 1rem;
+}
+
+.panelCompact {
+  padding: 0.85rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.headerTitle h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.overall {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  border-radius: 0.65rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.overallValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.overallLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.gradeExcellent {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.gradeGood {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.gradeFair {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.gradePoor {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.metricRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metricHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.metricScore {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.barTrack {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.barExcellent {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.barGood {
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+}
+
+.barFair {
+  background: linear-gradient(90deg, #fbbf24, #d97706);
+}
+
+.barPoor {
+  background: linear-gradient(90deg, #f87171, #dc2626);
+}
+
+.meta {
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.warnings {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #b45309;
+}
+
+.ok {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #059669;
+}
+
+.tips {
+  margin: 0.65rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.tips li + li {
+  margin-top: 0.2rem;
+}

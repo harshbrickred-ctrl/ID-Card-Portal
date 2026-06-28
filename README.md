@@ -6,7 +6,7 @@ Production-ready portal for school student ID card printing.
 
 - **Login** — credential-based admin access
 - **Dashboard** — setup checklist per school, analytics, print activity
-- **Templates** — upload per-school ID card designs (PNG/JPG), quality check on upload, visual layout editor
+- **Templates** — upload per-school ID card designs (PNG/JPG), **Template Health Score** (resolution/DPI/contrast/printability), visual layout editor
 - **Students** — import from Excel, edit records, upload photos (required for print)
 - **Print** — filter by enroll ID / name / class / section, preview front **and** back, download PDF print sheet (A4) or ZIP of PNGs
 

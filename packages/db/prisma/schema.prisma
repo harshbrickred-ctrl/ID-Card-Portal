@@ -89,6 +89,7 @@ model IdCardTemplate {
   sourceFormat  String?
   signaturePath String?
   layoutJson    Json?
+  healthJson    Json?
   sourceWidth   Int?
   sourceHeight  Int?
   createdAt     DateTime @default(now())

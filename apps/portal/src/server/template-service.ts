@@ -2,7 +2,7 @@ import { prisma } from "@idportal/db";
 import { Prisma } from "@prisma/client";
 import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import { TemplateLayoutSchema, type TemplateLayoutDto } from "@idportal/contracts";
-import { renderStudentCard, renderStudentCardBack, resolveCardDimensions, assessTemplateQuality } from "@idportal/card-engine";
+import { renderStudentCard, renderStudentCardBack, resolveCardDimensions, assessTemplateHealth, parseTemplateHealthReport } from "@idportal/card-engine";
 import sharp from "sharp";
 import { rasterizeTemplate } from "./template-converter";
 import { parseTemplateLayoutJson, parseTemplateLayoutJsonOrNull } from "./template-layout";
@@ -114,6 +114,7 @@ function mapTemplate(t: {
   sourceFormat: string | null;
   signaturePath: string | null;
   layoutJson: unknown;
+  healthJson: unknown;
   sourceWidth: number | null;
   sourceHeight: number | null;
   createdAt: Date;
@@ -127,9 +128,30 @@ function mapTemplate(t: {
     sourceUrl: t.sourcePath ? versionedPublicUrl(t.sourcePath, t.updatedAt) : null,
     signatureUrl: t.signaturePath ? versionedPublicUrl(t.signaturePath, t.updatedAt) : null,
     layoutJson: t.layoutJson,
+    health: parseTemplateHealthReport(t.healthJson),
     sourceWidth: t.sourceWidth,
     sourceHeight: t.sourceHeight,
   };
+}
+
+async function computeAndStoreTemplateHealth(template: { id: string; filePath: string }) {
+  const buffer = await readStorageFile(template.filePath);
+  if (!buffer) return null;
+  const health = await assessTemplateHealth(buffer);
+  await prisma.idCardTemplate.update({
+    where: { id: template.id },
+    data: { healthJson: health as object },
+  });
+  return health;
+}
+
+async function withTemplateHealth<T extends { id: string; filePath: string; healthJson: unknown }>(
+  template: T,
+  mapped: ReturnType<typeof mapTemplate>,
+) {
+  if (mapped.health) return mapped;
+  const health = await computeAndStoreTemplateHealth(template);
+  return { ...mapped, health };
 }
 
 export async function listTemplates() {
@@ -137,7 +159,7 @@ export async function listTemplates() {
     include: { school: { select: { id: true, name: true, code: true, accentColor: true } } },
     orderBy: { updatedAt: "desc" },
   });
-  return templates.map(mapTemplate);
+  return Promise.all(templates.map((t) => withTemplateHealth(t, mapTemplate(t))));
 }
 
 export async function uploadTemplate(
@@ -190,6 +212,8 @@ export async function uploadTemplate(
     );
   }
 
+  const health = await assessTemplateHealth(rasterBuffer);
+
   const template = await prisma.idCardTemplate.upsert({
     where: { schoolId },
     create: {
@@ -199,6 +223,7 @@ export async function uploadTemplate(
       sourcePath: sourcePathStored,
       sourceFormat: isRasterTemplateFormat(format) ? null : format,
       signaturePath: signaturePath ?? null,
+      healthJson: health as object,
       sourceWidth,
       sourceHeight,
     },
@@ -209,18 +234,17 @@ export async function uploadTemplate(
       sourceFormat: isRasterTemplateFormat(format) ? null : format,
       ...(signaturePath ? { signaturePath } : {}),
       layoutJson: Prisma.JsonNull,
+      healthJson: health as object,
       sourceWidth,
       sourceHeight,
     },
     include: { school: true },
   });
 
-  const quality =
-    sourceWidth && sourceHeight ? assessTemplateQuality(sourceWidth, sourceHeight) : null;
-
   return {
     ...mapTemplate(template),
-    quality,
+    health,
+    quality: health,
     layoutCleared: Boolean(existing?.layoutJson),
   };
 }
@@ -427,7 +451,7 @@ export async function getTemplateForSchool(schoolId: string) {
     include: { school: true },
   });
   if (!template) return null;
-  return mapTemplate(template);
+  return withTemplateHealth(template, mapTemplate(template));
 }
 
 export async function loadTemplateAssets(schoolId: string) {

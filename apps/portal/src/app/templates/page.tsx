@@ -13,6 +13,8 @@ import {
   Upload,
 } from "lucide-react";
 import { apiFetch, apiUploadFormData, type UploadProgressPhase } from "@/lib/api/client";
+import { TemplateHealthPanel } from "@/components/templates/TemplateHealthPanel";
+import type { TemplateHealthReport } from "@idportal/card-engine";
 import { useAuthStore } from "@/lib/auth-store";
 import dash from "@/components/dashboard/dashboard.module.css";
 import styles from "@/components/templates/templates.module.css";
@@ -26,6 +28,7 @@ type Template = {
   sourceFormat: string | null;
   signatureUrl: string | null;
   hasLayout?: boolean;
+  health?: TemplateHealthReport | null;
   school: School;
   updatedAt: string;
 };
@@ -49,6 +52,7 @@ export default function TemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [replaceConfirm, setReplaceConfirm] = useState(false);
+  const [latestHealth, setLatestHealth] = useState<TemplateHealthReport | null>(null);
 
   async function load() {
     setLoadError("");
@@ -149,36 +153,27 @@ export default function TemplatesPage() {
       if (signature) fd.append("signature", signature);
       const result = await apiUploadFormData<{
         id: string;
-        quality?: {
-          width: number;
-          height: number;
-          matchesCr80: boolean;
-          resolutionGrade: string;
-          warnings: string[];
-          tips: string[];
-        };
+        health?: TemplateHealthReport;
         layoutCleared?: boolean;
       }>("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
       });
 
-      const quality = result.quality;
+      const health = result.health ?? null;
+      if (health) setLatestHealth(health);
+
       let text = "Template uploaded. Open Edit layout to place photo, signature, and student fields.";
       if (result.layoutCleared) {
         text += " Previous field layout was cleared — re-save layout before printing.";
       }
-      if (quality) {
-        const grade =
-          quality.resolutionGrade === "excellent"
-            ? "Excellent size for CR-80 printing."
-            : quality.resolutionGrade === "low"
-              ? "Low resolution — consider re-exporting at 300 DPI."
-              : `Image size: ${quality.width}×${quality.height}px.`;
-        text += ` ${grade}`;
-        if (quality.warnings.length > 0) text += ` ${quality.warnings[0]}`;
+      if (health) {
+        text += ` Template health: ${health.overall}/100.`;
       }
 
-      setBanner({ type: quality?.warnings.length ? "error" : "success", text });
+      setBanner({
+        type: health && health.warnings.length > 0 ? "error" : "success",
+        text,
+      });
       setFile(null);
       setSignature(null);
       setName("");
@@ -370,14 +365,18 @@ export default function TemplatesPage() {
                 />
               </div>
               <div className={styles.tipsBox}>
-                <p className={styles.tipsTitle}>Exporting from CorelDRAW / Canva</p>
+                <p className={styles.tipsTitle}>Template Health Score</p>
                 <ul className="space-y-1">
-                  <li>Export as <strong>PNG</strong> or <strong>JPG</strong> at 300 DPI (not PDF).</li>
-                  <li>CR-80 size: 85.6×53.98 mm (≈ 1011×638 px) — match your physical card.</li>
-                  <li>After upload, use <strong>Edit layout</strong> to drag fields into place (no JSON file needed).</li>
-                  <li>Signature is reused on every card; student fields are filled at print.</li>
+                  <li>After upload we score resolution, DPI, contrast, and printability (0–100).</li>
+                  <li>WhatsApp/JPEG compression and low resolution are flagged before you print.</li>
+                  <li>Export as <strong>PNG</strong> or <strong>JPG</strong> at 300 DPI (1011×638 px for CR-80).</li>
                 </ul>
               </div>
+              {latestHealth ? (
+                <div className={styles.healthPreview}>
+                  <TemplateHealthPanel health={latestHealth} compact />
+                </div>
+              ) : null}
               <button type="submit" disabled={loading || !file || !schoolId} className={styles.submitBtn}>
                 {loading ? "Working…" : "Save template"}
               </button>
@@ -425,6 +424,11 @@ export default function TemplatesPage() {
                         </span>
                       </div>
                     </div>
+                    {t.health ? (
+                      <div className={styles.healthPanelWrap}>
+                        <TemplateHealthPanel health={t.health} />
+                      </div>
+                    ) : null}
                     <div className={styles.previewWrap}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img

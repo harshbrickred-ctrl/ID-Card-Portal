@@ -17,5 +17,10 @@ export {
   buildStudentPrintZip,
   buildStudentPrintPdf,
 } from "./render";
-export { assessTemplateQuality } from "./template-quality";
-export type { TemplateQualityReport } from "./template-quality";
+export { assessTemplateQuality, assessTemplateHealth, parseTemplateHealthReport } from "./template-quality";
+export type {
+  TemplateQualityReport,
+  TemplateHealthReport,
+  TemplateHealthScores,
+  TemplateHealthGrade,
+} from "./template-quality";
