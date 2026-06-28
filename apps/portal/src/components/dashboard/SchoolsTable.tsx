@@ -14,7 +14,11 @@ type SchoolRow = {
   studentCount: number;
   printJobCount: number;
   hasTemplate: boolean;
+  hasLayout?: boolean;
+  templateId?: string | null;
   templateName: string | null;
+  printReady?: boolean;
+  setupStatus?: "ready" | "needs_students" | "needs_template" | "needs_layout";
 };
 
 type SchoolsTableProps = {
@@ -100,7 +104,17 @@ export function SchoolsTable({ schools, isSuperAdmin = false, readOnly = false, 
                 <td className={styles.colNum}>{s.hasTemplate ? "01" : "00"}</td>
                 <td className={styles.colStatus}>
                   <div className={styles.statusCell}>
-                    <span className={styles.statusBadge}>Active</span>
+                    {s.printReady ? (
+                      <span className={styles.statusBadgeReady}>Ready to print</span>
+                    ) : s.setupStatus === "needs_layout" ? (
+                      <span className={styles.statusBadgeWarn}>Needs layout</span>
+                    ) : s.setupStatus === "needs_template" ? (
+                      <span className={styles.statusBadgeWarn}>No template</span>
+                    ) : s.setupStatus === "needs_students" ? (
+                      <span className={styles.statusBadgeWarn}>No students</span>
+                    ) : (
+                      <span className={styles.statusBadge}>Active</span>
+                    )}
                   </div>
                 </td>
                 {!readOnly && onDelete ? (

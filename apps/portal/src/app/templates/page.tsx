@@ -48,6 +48,7 @@ export default function TemplatesPage() {
   const [loadError, setLoadError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [replaceConfirm, setReplaceConfirm] = useState(false);
 
   async function load() {
     setLoadError("");
@@ -127,9 +128,16 @@ export default function TemplatesPage() {
     }
   }
 
-  async function upload(e: React.FormEvent) {
+  async function upload(e: React.FormEvent, forceReplace = false) {
     e.preventDefault();
     if (!file || !schoolId) return;
+
+    const existing = visibleTemplates[0];
+    if (existing?.hasLayout && !forceReplace) {
+      setReplaceConfirm(true);
+      return;
+    }
+
     setLoading(true);
     setUploadProgress({ phase: "uploading", percent: 0 });
     setBanner(null);
@@ -139,16 +147,42 @@ export default function TemplatesPage() {
       fd.append("name", name || "School ID Template");
       fd.append("file", file);
       if (signature) fd.append("signature", signature);
-      const result = await apiUploadFormData("/v1/templates", fd, (phase, percent) => {
+      const result = await apiUploadFormData<{
+        id: string;
+        quality?: {
+          width: number;
+          height: number;
+          matchesCr80: boolean;
+          resolutionGrade: string;
+          warnings: string[];
+          tips: string[];
+        };
+        layoutCleared?: boolean;
+      }>("/v1/templates", fd, (phase, percent) => {
         setUploadProgress({ phase, percent });
       });
-      setBanner({
-        type: "success",
-        text: "Template uploaded. Open Edit layout to place photo, signature, and student fields on the card.",
-      });
+
+      const quality = result.quality;
+      let text = "Template uploaded. Open Edit layout to place photo, signature, and student fields.";
+      if (result.layoutCleared) {
+        text += " Previous field layout was cleared — re-save layout before printing.";
+      }
+      if (quality) {
+        const grade =
+          quality.resolutionGrade === "excellent"
+            ? "Excellent size for CR-80 printing."
+            : quality.resolutionGrade === "low"
+              ? "Low resolution — consider re-exporting at 300 DPI."
+              : `Image size: ${quality.width}×${quality.height}px.`;
+        text += ` ${grade}`;
+        if (quality.warnings.length > 0) text += ` ${quality.warnings[0]}`;
+      }
+
+      setBanner({ type: quality?.warnings.length ? "error" : "success", text });
       setFile(null);
       setSignature(null);
       setName("");
+      setReplaceConfirm(false);
       await load();
     } catch (err) {
       setBanner({ type: "error", text: err instanceof Error ? err.message : "Upload failed" });
@@ -443,6 +477,34 @@ export default function TemplatesPage() {
           </section>
         </div>
       </div>
+
+      {replaceConfirm ? (
+        <div className={dash.modalBackdrop} onClick={() => setReplaceConfirm(false)}>
+          <div className={dash.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2 className={dash.modalTitle}>Replace template?</h2>
+            <p className="mt-2 text-sm text-[#64748b]">
+              This school already has a saved field layout. Uploading a new image will{" "}
+              <strong>clear the layout</strong> and you will need to place fields again.
+            </p>
+            <div className={`${dash.modalActions} mt-4`}>
+              <button type="button" className={dash.modalCancel} onClick={() => setReplaceConfirm(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={dash.modalSubmit}
+                disabled={loading}
+                onClick={() => {
+                  setReplaceConfirm(false);
+                  void upload({ preventDefault: () => {} } as React.FormEvent, true);
+                }}
+              >
+                Replace and upload
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteTarget ? (
         <div className={dash.modalBackdrop} onClick={() => setDeleteTarget(null)}>

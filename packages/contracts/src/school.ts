@@ -51,7 +51,16 @@ export const PrintPreviewSchema = z
     message: "Provide studentIds or filters",
   });
 
-export const PrintExecuteSchema = PrintPreviewSchema;
+export const PrintExecuteSchema = z
+  .object({
+    schoolId: z.string().uuid(),
+    studentIds: z.array(z.string().uuid()).optional(),
+    filters: PrintFiltersSchema.optional(),
+    format: z.enum(["zip", "pdf"]).default("zip"),
+  })
+  .refine((d) => (d.studentIds && d.studentIds.length > 0) || d.filters, {
+    message: "Provide studentIds or filters",
+  });
 
 export type SchoolDto = z.infer<typeof SchoolSchema>;
 export type SchoolUpdateDto = z.infer<typeof SchoolUpdateSchema>;

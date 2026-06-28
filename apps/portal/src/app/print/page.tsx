@@ -30,7 +30,7 @@ import {
 
 } from "lucide-react";
 
-import { apiFetch, apiPostZip } from "@/lib/api/client";
+import { apiFetch, apiPostDownload } from "@/lib/api/client";
 
 import { CardPreviewModal } from "@/components/CardPreviewModal";
 
@@ -74,6 +74,8 @@ type PreviewItem = {
 
   previewFront: string;
 
+  previewBack: string;
+
 };
 
 type PreviewResult = {
@@ -92,7 +94,7 @@ type PreviewResult = {
 
 
 
-type TemplateSummary = { schoolId: string; name: string; hasLayout: boolean };
+type TemplateSummary = { id: string; schoolId: string; name: string; hasLayout: boolean };
 
 
 
@@ -119,6 +121,8 @@ export default function PrintPage() {
   const [printing, setPrinting] = useState(false);
 
   const [modalCard, setModalCard] = useState<PreviewItem | null>(null);
+  const [modalSide, setModalSide] = useState<"front" | "back">("front");
+  const [printFormat, setPrintFormat] = useState<"zip" | "pdf">("pdf");
 
   const [step, setStep] = useState<"select" | "preview">("select");
 
@@ -164,7 +168,7 @@ export default function PrintPage() {
 
       apiFetch<School[]>("/v1/schools"),
 
-      apiFetch<{ schoolId: string; name: string; hasLayout?: boolean }[]>("/v1/templates"),
+      apiFetch<{ id: string; schoolId: string; name: string; hasLayout?: boolean }[]>("/v1/templates"),
 
     ]).then(([schoolsResult, templatesResult]) => {
 
@@ -209,21 +213,14 @@ export default function PrintPage() {
 
 
       if (templatesResult.status === "fulfilled") {
-
         setTemplates(
-
           templatesResult.value.map((row) => ({
-
+            id: row.id,
             schoolId: row.schoolId,
-
             name: row.name,
-
             hasLayout: Boolean(row.hasLayout),
-
           })),
-
         );
-
       } else if (!error) {
 
         error =
@@ -285,19 +282,12 @@ export default function PrintPage() {
     }
 
     if (!schoolTemplate.hasLayout) {
-
       return {
-
         tone: "warn" as const,
-
-        text: `“${schoolTemplate.name}” is uploaded but field layout is not saved.`,
-
-        link: `/templates?schoolId=${schoolId}`,
-
+        text: `"${schoolTemplate.name}" is uploaded but field layout is not saved.`,
+        link: `/templates/${schoolTemplate.id}/layout`,
         linkLabel: "Edit layout",
-
       };
-
     }
 
     return {
@@ -313,6 +303,17 @@ export default function PrintPage() {
     };
 
   }, [schoolTemplate, schoolId]);
+
+
+
+  const previewBlockers = useMemo(() => {
+    if (!preview || preview.canPrint) return [];
+    const msgs = new Set<string>();
+    for (const p of preview.previews) {
+      for (const e of p.errors) msgs.add(e);
+    }
+    return [...msgs];
+  }, [preview]);
 
 
 
@@ -452,14 +453,10 @@ export default function PrintPage() {
 
     try {
 
-      await apiPostZip(
-
+      await apiPostDownload(
         "/v1/print/execute",
-
-        { schoolId, studentIds },
-
-        `id-cards-${selectedSchool?.code ?? "school"}.zip`,
-
+        { schoolId, studentIds, format: printFormat },
+        `id-cards-${selectedSchool?.code ?? "school"}`,
       );
 
       setStep("select");
@@ -484,7 +481,7 @@ export default function PrintPage() {
 
   const hasTemplate = Boolean(schoolTemplate);
   const hasLayoutReady = Boolean(schoolTemplate?.hasLayout);
-  const canPreview = hasTemplate && students.length > 0;
+  const canPreview = hasTemplate && hasLayoutReady && students.length > 0;
 
 
 
@@ -500,7 +497,7 @@ export default function PrintPage() {
 
             <Loader2 className="mx-auto h-11 w-11 animate-spin text-[#0d9488]" />
 
-            <p className={styles.progressTitle}>Building ZIP download…</p>
+            <p className={styles.progressTitle}>Preparing download…</p>
 
             <p className={styles.progressHint}>
 
@@ -814,7 +811,7 @@ export default function PrintPage() {
                     !hasTemplate
                       ? "Upload a template for this school first"
                       : !hasLayoutReady
-                        ? "Layout not saved — preview works but fields may be missing until you save layout"
+                        ? "Save field layout in Templates → Edit layout before previewing"
                         : undefined
                   }
 
@@ -840,7 +837,7 @@ export default function PrintPage() {
                     !hasTemplate
                       ? "Upload a template for this school first"
                       : !hasLayoutReady
-                        ? "Layout not saved — preview works but fields may be missing until you save layout"
+                        ? "Save field layout in Templates → Edit layout before previewing"
                         : undefined
                   }
 
@@ -968,27 +965,50 @@ export default function PrintPage() {
 
               </div>
 
-              <button
-
-                type="button"
-
-                disabled={!preview.canPrint || printing}
-
-                onClick={() => void printCards()}
-
-                className={dash.primaryBtn}
-
-              >
-
-                <Printer className="h-4 w-4" />
-
-                {printing ? "Building ZIP…" : `Print ${preview.previews.length} cards`}
-
-                <Download className="h-4 w-4" />
-
-              </button>
+              <div className={styles.actionRow}>
+                <label className={styles.formatSelect}>
+                  <span className="sr-only">Download format</span>
+                  <select
+                    value={printFormat}
+                    onChange={(e) => setPrintFormat(e.target.value as "zip" | "pdf")}
+                    className={styles.formSelect}
+                    disabled={printing}
+                  >
+                    <option value="pdf">PDF print sheet (A4)</option>
+                    <option value="zip">ZIP (PNG files)</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!preview.canPrint || printing}
+                  onClick={() => void printCards()}
+                  className={dash.primaryBtn}
+                >
+                  <Printer className="h-4 w-4" />
+                  {printing ? "Preparing download…" : `Download ${preview.previews.length} cards`}
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
 
             </div>
+
+
+
+            {!preview.canPrint && previewBlockers.length > 0 ? (
+              <div className={`${styles.statusBanner} ${styles.statusWarn}`}>
+                <p style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Printing is blocked until you fix:</p>
+                <ul className={styles.errorList}>
+                  {previewBlockers.map((e) => (
+                    <li key={e}>• {e}</li>
+                  ))}
+                </ul>
+                {previewBlockers.some((e) => e.toLowerCase().includes("layout")) && schoolTemplate ? (
+                  <Link href={`/templates/${schoolTemplate.id}/layout`} className={dash.linkBtn} style={{ marginTop: "0.75rem", display: "inline-flex" }}>
+                    Open layout editor
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
 
 
 
@@ -1032,25 +1052,35 @@ export default function PrintPage() {
 
 
 
-                  <button
-
-                    type="button"
-
-                    className={styles.previewThumb}
-
-                    onClick={() => setModalCard(p)}
-
-                    aria-label={`Enlarge preview for ${p.name}`}
-
-                  >
-
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-
-                    <img src={p.previewFront} alt={`Preview for ${p.name}`} className={styles.previewThumbImg} />
-
-                    <p className={styles.previewThumbHint}>Click card to open full preview</p>
-
-                  </button>
+                  <div className={styles.previewThumbGrid}>
+                    <button
+                      type="button"
+                      className={styles.previewThumb}
+                      onClick={() => {
+                        setModalCard(p);
+                        setModalSide("front");
+                      }}
+                      aria-label={`Enlarge front preview for ${p.name}`}
+                    >
+                      <span className={styles.previewSideLabel}>Front</span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.previewFront} alt={`Front preview for ${p.name}`} className={styles.previewThumbImg} />
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.previewThumb}
+                      onClick={() => {
+                        setModalCard(p);
+                        setModalSide("back");
+                      }}
+                      aria-label={`Enlarge back preview for ${p.name}`}
+                    >
+                      <span className={styles.previewSideLabel}>Back</span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.previewBack} alt={`Back preview for ${p.name}`} className={styles.previewThumbImg} />
+                    </button>
+                  </div>
+                  <p className={styles.previewThumbHint}>Click front or back to inspect full size</p>
 
 
 
@@ -1077,25 +1107,17 @@ export default function PrintPage() {
 
 
             <CardPreviewModal
-
               open={modalCard != null}
-
               onClose={() => setModalCard(null)}
-
               title={modalCard?.name ?? ""}
-
               subtitle={
-
                 modalCard ? `${modalCard.enrollId} · Class ${modalCard.class}-${modalCard.section}` : undefined
-
               }
-
               imageSrc={modalCard?.previewFront ?? ""}
-
+              imageSrcBack={modalCard?.previewBack}
               imageAlt={modalCard ? `ID card for ${modalCard.name}` : undefined}
-
               errors={modalCard?.errors}
-
+              initialSide={modalSide}
             />
 
           </>

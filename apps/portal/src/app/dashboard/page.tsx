@@ -8,6 +8,7 @@ import { ClassBreakdownPanel } from "@/components/dashboard/ClassBreakdownPanel"
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { PrintActivityChart } from "@/components/dashboard/PrintActivityChart";
 import { RecentPrintJobs } from "@/components/dashboard/RecentPrintJobs";
+import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
 import { SchoolsTable } from "@/components/dashboard/SchoolsTable";
 import styles from "@/components/dashboard/dashboard.module.css";
 
@@ -48,7 +49,11 @@ type DashboardData = {
     studentCount: number;
     printJobCount: number;
     hasTemplate: boolean;
+    hasLayout: boolean;
+    templateId: string | null;
     templateName: string | null;
+    setupStatus: "ready" | "needs_students" | "needs_template" | "needs_layout";
+    printReady: boolean;
   }[];
 };
 
@@ -99,6 +104,8 @@ export default function DashboardPage() {
           </Link>
         </div>
       </header>
+
+      <SetupChecklist schools={data.schools} />
 
       <div className={styles.kpiGrid}>
         <KpiCard

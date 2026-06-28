@@ -4,14 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
-  BarChart3,
   CreditCard,
   GraduationCap,
   HelpCircle,
   LayoutDashboard,
   LogOut,
   Printer,
-  Settings,
   Users,
   FileImage,
 } from "lucide-react";
@@ -25,18 +23,11 @@ const nav = [
   { href: "/students", label: "Students", icon: Users, match: "path" as const },
   { href: "/templates", label: "Templates", icon: FileImage, match: "path" as const },
   { href: "/print", label: "Print IDs", icon: Printer, match: "path" as const },
-  { href: "#reports", label: "Reports", icon: BarChart3, match: "none" as const },
-  { href: "#settings", label: "Settings", icon: Settings, match: "none" as const },
 ];
 
-function isNavActive(
-  item: (typeof nav)[number],
-  pathname: string,
-): boolean {
-  if (item.match === "none") return false;
-  if (item.match === "exact") return pathname === "/dashboard";
-  if (item.match === "path") return pathname === item.href || pathname.startsWith(`${item.href}/`);
-  return false;
+function isNavActive(item: (typeof nav)[number], pathname: string): boolean {
+  if (item.match === "exact") return pathname === item.href;
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 function userInitials(name: string): string {
@@ -90,21 +81,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className={styles.nav}>
-            {nav.map((item, index) => {
+            {nav.map((item) => {
               const active = isNavActive(item, pathname);
-              const showDivider = item.match === "none" && index === nav.findIndex((n) => n.match === "none");
               return (
                 <div key={item.label}>
-                  {showDivider ? <div className={styles.navDivider} aria-hidden="true" /> : null}
-                  <Link
-                    href={item.href}
-                    className={cn(styles.navLink, active && styles.navLinkActive)}
-                    onClick={
-                      item.match === "none"
-                        ? (e) => e.preventDefault()
-                        : undefined
-                    }
-                  >
+                  <Link href={item.href} className={cn(styles.navLink, active && styles.navLinkActive)}>
                     <span className={styles.navIcon} aria-hidden="true">
                       <item.icon className="h-4 w-4" />
                     </span>

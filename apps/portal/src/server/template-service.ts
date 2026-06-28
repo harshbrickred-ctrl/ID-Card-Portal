@@ -1,10 +1,11 @@
 import { prisma } from "@idportal/db";
+import { Prisma } from "@prisma/client";
 import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import { TemplateLayoutSchema, type TemplateLayoutDto } from "@idportal/contracts";
-import { renderStudentCard } from "@idportal/card-engine";
+import { renderStudentCard, renderStudentCardBack, resolveCardDimensions, assessTemplateQuality } from "@idportal/card-engine";
 import sharp from "sharp";
 import { rasterizeTemplate } from "./template-converter";
-import { parseTemplateLayoutJson } from "./template-layout";
+import { parseTemplateLayoutJson, parseTemplateLayoutJsonOrNull } from "./template-layout";
 import { deleteStorageFile, publicFileUrl, readStorageFile, saveFile, versionedPublicUrl } from "./storage";
 import type { TemplateSourceFormat } from "./template-utils";
 import { isRasterTemplateFormat } from "./template-utils";
@@ -121,7 +122,7 @@ function mapTemplate(t: {
 }) {
   return {
     ...t,
-    hasLayout: t.layoutJson != null,
+    hasLayout: t.layoutJson != null && parseTemplateLayoutJsonOrNull(t.layoutJson) != null,
     fileUrl: versionedPublicUrl(t.filePath, t.updatedAt),
     sourceUrl: t.sourcePath ? versionedPublicUrl(t.sourcePath, t.updatedAt) : null,
     signatureUrl: t.signaturePath ? versionedPublicUrl(t.signaturePath, t.updatedAt) : null,
@@ -207,13 +208,21 @@ export async function uploadTemplate(
       sourcePath: sourcePathStored,
       sourceFormat: isRasterTemplateFormat(format) ? null : format,
       ...(signaturePath ? { signaturePath } : {}),
+      layoutJson: Prisma.JsonNull,
       sourceWidth,
       sourceHeight,
     },
     include: { school: true },
   });
 
-  return mapTemplate(template);
+  const quality =
+    sourceWidth && sourceHeight ? assessTemplateQuality(sourceWidth, sourceHeight) : null;
+
+  return {
+    ...mapTemplate(template),
+    quality,
+    layoutCleared: Boolean(existing?.layoutJson),
+  };
 }
 
 export async function getTemplateById(id: string) {
@@ -347,8 +356,32 @@ export async function previewTemplateLayout(
     layout,
   });
 
+  const cardDimensions = await resolveCardDimensions(layout, templateBuffer);
+  const back = await renderStudentCardBack(
+    {
+      enrollId: student.enrollId,
+      name: student.name,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      class: student.class,
+      section: student.section,
+      dob: student.dob,
+      phoneNumber: student.phoneNumber,
+      address: student.address,
+      photoBuffer,
+    },
+    {
+      name: template.school.name,
+      code: template.school.code,
+      accentColor: template.school.accentColor,
+      academicYear: template.school.academicYear,
+    },
+    cardDimensions,
+  );
+
   return {
     previewFront: `data:image/png;base64,${front.toString("base64")}`,
+    previewBack: `data:image/png;base64,${back.toString("base64")}`,
     studentName: student.name,
     enrollId: student.enrollId,
   };

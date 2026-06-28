@@ -430,6 +430,28 @@
   padding: 0.2rem 0.65rem;
 }
 
+.statusBadgeReady {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+}
+
+.statusBadgeWarn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+}
+
 .menuBtn {
   display: inline-flex;
   align-items: center;

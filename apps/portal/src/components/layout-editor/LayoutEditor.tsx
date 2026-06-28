@@ -12,6 +12,8 @@ import styles from "./LayoutEditor.module.css";
 
 const EDITOR_FIELDS: TemplateFieldKeyDto[] = [
   "name",
+  "firstName",
+  "lastName",
   "enrollId",
   "classSection",
   "dob",
@@ -168,6 +170,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBackUrl, setPreviewBackUrl] = useState<string | null>(null);
   const [previewMeta, setPreviewMeta] = useState<{ name: string; enrollId: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [message, setMessage] = useState(
@@ -370,7 +373,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
     setPreviewing(true);
     setMessage("");
     try {
-      const result = await apiFetch<{ previewFront: string; studentName: string; enrollId: string }>(
+      const result = await apiFetch<{ previewFront: string; previewBack: string; studentName: string; enrollId: string }>(
         `/v1/templates/${template.id}/layout/preview`,
         {
           method: "POST",
@@ -378,6 +381,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
         },
       );
       setPreviewUrl(result.previewFront);
+      setPreviewBackUrl(result.previewBack);
       setPreviewMeta({ name: result.studentName, enrollId: result.enrollId });
       setPreviewModalOpen(true);
       setMessageType("success");
@@ -758,6 +762,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
         title={previewMeta?.name ?? "Card preview"}
         subtitle={previewMeta ? `${previewMeta.enrollId} · sample student` : undefined}
         imageSrc={previewUrl ?? ""}
+        imageSrcBack={previewBackUrl ?? undefined}
         imageAlt="Layout preview"
       />
     </>

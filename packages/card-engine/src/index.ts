@@ -15,4 +15,7 @@ export {
   renderStudentCardBack,
   validateStudentCard,
   buildStudentPrintZip,
+  buildStudentPrintPdf,
 } from "./render";
+export { assessTemplateQuality } from "./template-quality";
+export type { TemplateQualityReport } from "./template-quality";

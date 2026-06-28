@@ -92,7 +92,7 @@ export async function getDashboard() {
       orderBy: { name: "asc" },
       include: {
         _count: { select: { students: true, printJobs: true } },
-        template: { select: { id: true, name: true } },
+        template: { select: { id: true, name: true, layoutJson: true } },
       },
     }),
     prisma.student.groupBy({
@@ -196,16 +196,30 @@ export async function getDashboard() {
       createdAt: p.createdAt.toISOString(),
       school: p.school,
     })),
-    schools: schools.map((s) => ({
-      id: s.id,
-      name: s.name,
-      code: s.code,
-      accentColor: s.accentColor,
-      logoUrl: s.logoUrl,
-      studentCount: s._count.students,
-      printJobCount: s._count.printJobs,
-      hasTemplate: !!s.template,
-      templateName: s.template?.name ?? null,
-    })),
+    schools: schools.map((s) => {
+      const hasTemplate = Boolean(s.template);
+      const hasLayout = Boolean(s.template?.layoutJson);
+      const studentCount = s._count.students;
+      let setupStatus: "ready" | "needs_students" | "needs_template" | "needs_layout" = "ready";
+      if (studentCount === 0) setupStatus = "needs_students";
+      else if (!hasTemplate) setupStatus = "needs_template";
+      else if (!hasLayout) setupStatus = "needs_layout";
+
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        accentColor: s.accentColor,
+        logoUrl: s.logoUrl,
+        studentCount,
+        printJobCount: s._count.printJobs,
+        hasTemplate,
+        hasLayout,
+        templateId: s.template?.id ?? null,
+        templateName: s.template?.name ?? null,
+        setupStatus,
+        printReady: setupStatus === "ready",
+      };
+    }),
   };
 }

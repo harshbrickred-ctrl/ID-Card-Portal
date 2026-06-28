@@ -7,18 +7,25 @@ import * as printService from "@/server/print-service";
 export const POST = withApi(async (req) => {
   await requireAuth(req);
   const body = await validateBody(req, PrintExecuteSchema);
-  const { zip, jobId, cardCount } = await printService.executePrint(
+  const result = await printService.executePrint(
     body.schoolId,
     body.studentIds,
     body.filters,
+    body.format,
   );
 
-  return new NextResponse(new Uint8Array(zip), {
+  const isPdf = result.format === "pdf";
+  const payload = isPdf ? result.pdf! : result.zip!;
+  const contentType = isPdf ? "application/pdf" : "application/zip";
+  const ext = isPdf ? "pdf" : "zip";
+
+  return new NextResponse(new Uint8Array(payload), {
     headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="id-cards-${jobId}.zip"`,
-      "X-Card-Count": String(cardCount),
-      "X-Job-Id": jobId,
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="id-cards-${result.jobId}.${ext}"`,
+      "X-Card-Count": String(result.cardCount),
+      "X-Job-Id": result.jobId,
+      "X-Print-Format": result.format,
     },
   });
 });

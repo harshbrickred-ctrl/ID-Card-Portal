@@ -76,6 +76,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function apiPostZip(path: string, body: unknown, filename: string) {
+  return apiPostDownload(path, body, filename.replace(/\.(zip|pdf)$/i, ""));
+}
+
+export async function apiPostDownload(path: string, body: unknown, filenameBase: string) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     credentials: "include",
@@ -87,11 +91,13 @@ export async function apiPostZip(path: string, body: unknown, filename: string) 
     const msg = json?.error?.message ?? "Print failed";
     throw new ApiError(Array.isArray(msg) ? msg.join("; ") : String(msg), res.status);
   }
+  const contentType = res.headers.get("Content-Type") ?? "";
+  const ext = contentType.includes("pdf") ? "pdf" : "zip";
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = `${filenameBase}.${ext}`;
   a.click();
   URL.revokeObjectURL(url);
 }

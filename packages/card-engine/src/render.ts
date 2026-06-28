@@ -242,12 +242,18 @@ export function validateStudentCard(student: RenderStudentCardInput["student"]):
   if (!student.enrollId?.trim()) errors.push("Enrollment ID is required");
   if (!student.class?.trim()) errors.push("Class is required");
   if (!student.section?.trim()) errors.push("Section is required");
-  if (!student.photoBuffer) errors.push("Student photo is recommended");
+  if (!student.photoBuffer) errors.push("Student photo is required");
   return errors;
 }
 
 export async function renderStudentCard(input: RenderStudentCardInput): Promise<Buffer> {
   const { student, school, templateBuffer, signatureBuffer } = input;
+  const hasCustomTemplate = Boolean(templateBuffer && templateBuffer.length > 0);
+
+  if (hasCustomTemplate && input.layout == null) {
+    return prepareTemplateBackground(templateBuffer!);
+  }
+
   const layout = input.layout ?? DEFAULT_TEMPLATE_LAYOUT;
   const accent = school.accentColor || "#6366f1";
 
@@ -378,4 +384,85 @@ export async function buildStudentPrintZip(
   await zipReady;
 
   return Buffer.concat(chunks);
+}
+
+const PDF_COLS = 2;
+const PDF_ROWS = 5;
+const PDF_PER_PAGE = PDF_COLS * PDF_ROWS;
+const MM_TO_PT = 72 / 25.4;
+const PDF_CARD_W = 85.6 * MM_TO_PT;
+const PDF_CARD_H = 53.98 * MM_TO_PT;
+const PDF_GAP = 10;
+const PDF_PAGE_W = 595.28;
+const PDF_PAGE_H = 841.89;
+
+async function addCardGridToPdf(
+  pdfDoc: Awaited<ReturnType<Awaited<typeof import("pdf-lib")>["PDFDocument"]["create"]>>,
+  rgb: (typeof import("pdf-lib"))["rgb"],
+  title: string,
+  sideLabel: string,
+  buffers: Buffer[],
+) {
+  const gridW = PDF_COLS * PDF_CARD_W + (PDF_COLS - 1) * PDF_GAP;
+  const gridH = PDF_ROWS * PDF_CARD_H + (PDF_ROWS - 1) * PDF_GAP;
+  const originX = (PDF_PAGE_W - gridW) / 2;
+  const topY = (PDF_PAGE_H + gridH) / 2;
+
+  for (let pageStart = 0; pageStart < buffers.length; pageStart += PDF_PER_PAGE) {
+    const page = pdfDoc.addPage([PDF_PAGE_W, PDF_PAGE_H]);
+    const batch = buffers.slice(pageStart, pageStart + PDF_PER_PAGE);
+    const pageNum = Math.floor(pageStart / PDF_PER_PAGE) + 1;
+    const totalPages = Math.ceil(buffers.length / PDF_PER_PAGE);
+
+    page.drawText(`${title} — ${sideLabel} (page ${pageNum}/${totalPages})`, {
+      x: 36,
+      y: PDF_PAGE_H - 28,
+      size: 9,
+      color: rgb(0.45, 0.45, 0.5),
+    });
+
+    for (let i = 0; i < batch.length; i++) {
+      const col = i % PDF_COLS;
+      const row = Math.floor(i / PDF_COLS);
+      const x = originX + col * (PDF_CARD_W + PDF_GAP);
+      const y = topY - row * (PDF_CARD_H + PDF_GAP) - PDF_CARD_H;
+      const png = await pdfDoc.embedPng(batch[i]);
+      page.drawImage(png, { x, y, width: PDF_CARD_W, height: PDF_CARD_H });
+      page.drawRectangle({
+        x,
+        y,
+        width: PDF_CARD_W,
+        height: PDF_CARD_H,
+        borderColor: rgb(0.82, 0.82, 0.85),
+        borderWidth: 0.5,
+      });
+    }
+  }
+}
+
+/** A4 print sheets: front pages first, then back pages (2×5 CR-80 grid per page). */
+export async function buildStudentPrintPdf(
+  entries: { enrollId: string; name: string; front: Buffer; back: Buffer }[],
+): Promise<Buffer> {
+  const { PDFDocument, rgb } = await import("pdf-lib");
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.setTitle("Student ID Cards");
+  pdfDoc.setCreator("School ID Card Portal");
+
+  await addCardGridToPdf(
+    pdfDoc,
+    rgb,
+    "Student ID Cards",
+    "Front",
+    entries.map((e) => e.front),
+  );
+  await addCardGridToPdf(
+    pdfDoc,
+    rgb,
+    "Student ID Cards",
+    "Back",
+    entries.map((e) => e.back),
+  );
+
+  return Buffer.from(await pdfDoc.save());
 }

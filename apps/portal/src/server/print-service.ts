@@ -3,6 +3,7 @@ import { BadRequestError, NotFoundError } from "@idportal/api-kit";
 import type { PrintFiltersDto } from "@idportal/contracts";
 import {
   buildStudentPrintZip,
+  buildStudentPrintPdf,
   renderStudentCard,
   renderStudentCardBack,
   resolveCardDimensions,
@@ -16,6 +17,7 @@ const BLOCKING_ERRORS = new Set([
   "Enrollment ID is required",
   "Class is required",
   "Section is required",
+  "Student photo is required",
 ]);
 
 const MAX_PRINT_BATCH = Number(process.env.MAX_PRINT_BATCH ?? "500");
@@ -138,15 +140,20 @@ export async function previewCards(
       if (layoutError) {
         errors.push(layoutError);
       }
-      const hasErrors = errors.some((e) => BLOCKING_ERRORS.has(e)) || !layoutReady;
+      const hasErrors =
+        !layoutReady || Boolean(layoutError) || errors.some((e) => BLOCKING_ERRORS.has(e));
 
-      const front = await renderStudentCard({
-        student: cardStudent,
-        school: schoolData,
-        templateBuffer,
-        signatureBuffer,
-        layout: layout ?? undefined,
-      });
+      const cardDimensions = await resolveCardDimensions(layout ?? undefined, templateBuffer);
+      const [front, back] = await Promise.all([
+        renderStudentCard({
+          student: cardStudent,
+          school: schoolData,
+          templateBuffer,
+          signatureBuffer,
+          layout: layout ?? undefined,
+        }),
+        renderStudentCardBack(cardStudent, schoolData, cardDimensions),
+      ]);
 
       return {
         studentId: s.id,
@@ -157,6 +164,7 @@ export async function previewCards(
         errors,
         hasErrors,
         previewFront: `data:image/png;base64,${front.toString("base64")}`,
+        previewBack: `data:image/png;base64,${back.toString("base64")}`,
       };
     }),
   );
@@ -180,6 +188,7 @@ export async function executePrint(
   schoolId: string,
   studentIds?: string[],
   filters?: PrintFiltersDto,
+  format: "zip" | "pdf" = "zip",
 ) {
   const { school, students } = await loadPrintBatch(schoolId, studentIds, filters);
   await assertPrintableStudents(students);
@@ -215,7 +224,8 @@ export async function executePrint(
     }),
   );
 
-  const zip = await buildStudentPrintZip(entries);
+  const zip = format === "pdf" ? null : await buildStudentPrintZip(entries);
+  const pdf = format === "pdf" ? await buildStudentPrintPdf(entries) : null;
 
   const job = await prisma.printJob.create({
     data: {
@@ -225,5 +235,11 @@ export async function executePrint(
     },
   });
 
-  return { jobId: job.id, cardCount: entries.length, zip };
+  return {
+    jobId: job.id,
+    cardCount: entries.length,
+    format,
+    zip: zip ?? undefined,
+    pdf: pdf ?? undefined,
+  };
 }

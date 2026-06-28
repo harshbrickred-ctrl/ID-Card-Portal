@@ -312,6 +312,27 @@
   color: #64748b;
 }
 
+.previewThumbGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.previewSideLabel {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.formatSelect {
+  display: flex;
+  align-items: center;
+}
+
 .errorList {
   margin-top: 0.75rem;
   font-size: 0.75rem;
