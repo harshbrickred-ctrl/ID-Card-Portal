@@ -53,6 +53,10 @@ function fieldValue(
         : student.name.trim().split(/\s+/).slice(1);
       return parts.join(" ") || "-";
     }
+    case "fatherName":
+      return student.fatherName?.trim() || "-";
+    case "motherName":
+      return student.motherName?.trim() || "-";
     case "enrollId":
       return student.enrollId;
     case "classSection":
@@ -107,7 +111,7 @@ function collectFieldTextItems(
       x: field.x,
       y: field.y + middleOffset,
       fontSize: field.fontSize,
-      bold: field.bold,
+      bold: field.bold ?? true,
       fill: field.fill ?? "#1a2e4a",
       anchor,
       baseline,

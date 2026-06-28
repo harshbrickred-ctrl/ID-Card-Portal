@@ -45,7 +45,7 @@ let fontsReady = false;
 function ensureCardFonts() {
   if (fontsReady) return;
   registerFont(cardFontPath("DejaVuSans.ttf"), { family: "CardFont" });
-  registerFont(cardFontPath("DejaVuSans-Bold.ttf"), { family: "CardFont", weight: "bold" });
+  registerFont(cardFontPath("DejaVuSans-Bold.ttf"), { family: "CardFontBold" });
   fontsReady = true;
 }
 
@@ -71,8 +71,8 @@ export async function renderTextOverlay(
     const lineHeight = item.lineHeight ?? Math.round(item.fontSize * 1.35);
     const lineIndex = item.lineIndex ?? 0;
     const fontSize = Math.max(8, Math.round(item.fontSize));
-    const weight = item.bold ? "bold" : "normal";
-    ctx.font = `${weight} ${fontSize}px "CardFont", sans-serif`;
+    const fontFamily = item.bold ? "CardFontBold" : "CardFont";
+    ctx.font = `${fontSize}px "${fontFamily}", sans-serif`;
     ctx.fillStyle = item.fill ?? "#1a2e4a";
     ctx.textAlign = mapTextAlign(item.anchor);
     ctx.textBaseline = item.baseline === "middle" ? "middle" : "alphabetic";

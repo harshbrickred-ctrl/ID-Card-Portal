@@ -27,6 +27,8 @@ async function buildCardData(student: {
   name: string;
   firstName: string | null;
   lastName: string | null;
+  fatherName: string | null;
+  motherName: string | null;
   class: string;
   section: string;
   dob: string | null;
@@ -40,6 +42,8 @@ async function buildCardData(student: {
     name: student.name,
     firstName: student.firstName,
     lastName: student.lastName,
+    fatherName: student.fatherName,
+    motherName: student.motherName,
     class: student.class,
     section: student.section,
     dob: student.dob,

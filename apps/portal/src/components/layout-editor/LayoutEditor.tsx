@@ -14,6 +14,8 @@ const EDITOR_FIELDS: TemplateFieldKeyDto[] = [
   "name",
   "firstName",
   "lastName",
+  "fatherName",
+  "motherName",
   "enrollId",
   "classSection",
   "dob",
@@ -146,7 +148,10 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   const [layout, setLayout] = useState<TemplateLayoutDto>(() =>
     normalizeLayout(template.layoutJson, sourceWidth, sourceHeight),
   );
-  const [selected, setSelected] = useState<Selection>("name");
+  const [selected, setSelected] = useState<Selection>(() => {
+    const initial = normalizeLayout(template.layoutJson, sourceWidth, sourceHeight);
+    return initial.fields[0]?.key ?? "photo";
+  });
   const [drag, setDrag] = useState<DragState | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -162,6 +167,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [zoom, setZoom] = useState(1);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const sidebarFieldRefs = useRef<Partial<Record<Selection, HTMLDivElement | null>>>({});
 
   const baseDisplayWidth = 920;
   const displayWidth = Math.round(baseDisplayWidth * zoom);
@@ -181,6 +187,18 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
         : selectedField
           ? FIELD_LABELS[selectedField.key]
           : null;
+
+  useEffect(() => {
+    if (selected === "photo" || selected === "signature" || selected === "label") return;
+    if (!layout.fields.some((field) => field.key === selected)) {
+      setSelected(layout.fields[0]?.key ?? "photo");
+    }
+  }, [layout.fields, selected]);
+
+  useEffect(() => {
+    const row = sidebarFieldRefs.current[selected];
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selected]);
 
   useEffect(() => {
     if (!drag) return;
@@ -265,7 +283,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   ) {
     e.preventDefault();
     e.stopPropagation();
-    setSelected(fieldKey ?? target);
+    selectField(fieldKey ?? target);
     setDrag({
       target,
       mode: "move",
@@ -285,7 +303,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
   ) {
     e.preventDefault();
     e.stopPropagation();
-    setSelected(target);
+    selectField(target);
     setDrag({
       target,
       mode: "resize",
@@ -306,30 +324,56 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
     }));
   }
 
+  function selectField(key: Selection) {
+    setSelected(key);
+  }
+
+  function createFieldEntry(
+    key: TemplateFieldKeyDto,
+    fields: TemplateLayoutDto["fields"],
+  ): TemplateLayoutDto["fields"][number] {
+    const last = fields[fields.length - 1];
+    const y = last ? last.y + Math.round(sourceHeight * 0.08) : Math.round(sourceHeight * 0.3);
+    return {
+      key,
+      x: Math.round(sourceWidth * 0.55),
+      y,
+      fontSize: 22,
+      bold: true,
+      maxWidth: Math.round(sourceWidth * 0.35),
+      showLabel: false,
+      labelX: Math.round(sourceWidth * 0.4),
+      labelY: y,
+      dominantBaseline: "middle",
+      fill: "#1a2e4a",
+    };
+  }
+
   function ensureField(key: TemplateFieldKeyDto) {
     setLayout((prev) => {
       if (prev.fields.some((f) => f.key === key)) return prev;
-      const last = prev.fields[prev.fields.length - 1];
-      const y = last ? last.y + Math.round(sourceHeight * 0.08) : Math.round(sourceHeight * 0.3);
       return {
         ...prev,
-        fields: [
-          ...prev.fields,
-          {
-            key,
-            x: Math.round(sourceWidth * 0.55),
-            y,
-            fontSize: 22,
-            maxWidth: Math.round(sourceWidth * 0.35),
-            showLabel: false,
-            labelX: Math.round(sourceWidth * 0.4),
-            labelY: y,
-            dominantBaseline: "middle" as const,
-            fill: "#1a2e4a",
-          },
-        ],
+        fields: [...prev.fields, createFieldEntry(key, prev.fields)],
       };
     });
+  }
+
+  function removeField(key: TemplateFieldKeyDto) {
+    setLayout((prev) => ({
+      ...prev,
+      fields: prev.fields.filter((field) => field.key !== key),
+    }));
+  }
+
+  function toggleFieldOnLayout(key: TemplateFieldKeyDto) {
+    const exists = layout.fields.some((field) => field.key === key);
+    if (exists) {
+      removeField(key);
+      return;
+    }
+    ensureField(key);
+    selectField(key);
   }
 
   async function saveLayout() {
@@ -421,7 +465,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
               ref={canvasRef}
               className={styles.canvas}
               style={{ width: displayWidth, height: displayHeight }}
-              onClick={() => setSelected("photo")}
+              onClick={() => selectField("photo")}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={template.fileUrl} alt={template.name} className={styles.templateImg} draggable={false} />
@@ -490,7 +534,9 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                     <div
                       className={`${styles.marker} ${isSelected ? styles.markerSelected : ""}`}
                       style={{ left: field.x * scale, top: field.y * scale }}
-                      title={`${FIELD_LABELS[field.key]} — drag to move`}
+                      title={`${FIELD_LABELS[field.key]} — click to select, drag to move`}
+                      aria-label={`${FIELD_LABELS[field.key]} field marker`}
+                      aria-pressed={isSelected}
                       onPointerDown={(e) => startDrag(e, field.key, field.x, field.y, field.key)}
                     />
                   </div>
@@ -517,45 +563,76 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
           </div>
 
           <p className={styles.hint}>
-            Drag the red dots into place. Turn <strong>Show label</strong> off when your template artwork already
-            prints labels like &quot;Enroll No :&quot;.
+            Click a red dot to select its field in the list below. Drag dots into place. Use{" "}
+            <strong>On layout</strong> to include or exclude fields (e.g. turn off Name if your card has no name line).
           </p>
 
           <p className={styles.sectionLabel}>Elements</p>
           <div className={styles.fieldList}>
-            <button
-              type="button"
-              className={`${styles.fieldBtn} ${selected === "photo" ? styles.fieldBtnActive : ""}`}
-              onClick={() => setSelected("photo")}
+            <div
+              ref={(el) => {
+                sidebarFieldRefs.current.photo = el;
+              }}
+              className={`${styles.fieldRow} ${selected === "photo" ? styles.fieldRowActive : ""}`}
             >
-              Photo area
-              <span className={`${styles.fieldStatus} ${styles.fieldStatusOn}`}>on</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.fieldBtn} ${selected === "signature" ? styles.fieldBtnActive : ""}`}
-              onClick={() => setSelected("signature")}
+              <button
+                type="button"
+                className={`${styles.fieldBtn} ${selected === "photo" ? styles.fieldBtnActive : ""}`}
+                onClick={() => selectField("photo")}
+              >
+                Photo area
+              </button>
+              <span className={`${styles.fieldStatus} ${styles.fieldStatusOn}`}>On</span>
+            </div>
+            <div
+              ref={(el) => {
+                sidebarFieldRefs.current.signature = el;
+              }}
+              className={`${styles.fieldRow} ${selected === "signature" ? styles.fieldRowActive : ""}`}
             >
-              Signature area
-              <span className={`${styles.fieldStatus} ${styles.fieldStatusOn}`}>on</span>
-            </button>
+              <button
+                type="button"
+                className={`${styles.fieldBtn} ${selected === "signature" ? styles.fieldBtnActive : ""}`}
+                onClick={() => selectField("signature")}
+              >
+                Signature area
+              </button>
+              <span className={`${styles.fieldStatus} ${styles.fieldStatusOn}`}>On</span>
+            </div>
             {EDITOR_FIELDS.map((key) => {
               const exists = layout.fields.some((f) => f.key === key);
+              const isActive = selected === key;
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
-                  className={`${styles.fieldBtn} ${selected === key ? styles.fieldBtnActive : ""}`}
-                  onClick={() => {
-                    ensureField(key);
-                    setSelected(key);
+                  ref={(el) => {
+                    sidebarFieldRefs.current[key] = el;
                   }}
+                  className={`${styles.fieldRow} ${isActive ? styles.fieldRowActive : ""} ${exists ? "" : styles.fieldRowOff}`}
                 >
-                  <span>{FIELD_LABELS[key]}</span>
-                  <span className={`${styles.fieldStatus} ${exists ? styles.fieldStatusOn : ""}`}>
-                    {exists ? "on" : "add"}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className={`${styles.fieldBtn} ${isActive ? styles.fieldBtnActive : ""}`}
+                    onClick={() => {
+                      if (exists) {
+                        selectField(key);
+                        return;
+                      }
+                      toggleFieldOnLayout(key);
+                    }}
+                  >
+                    {FIELD_LABELS[key]}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.layoutToggle} ${exists ? styles.layoutToggleOn : styles.layoutToggleOff}`}
+                    aria-pressed={exists}
+                    aria-label={`${exists ? "Remove" : "Add"} ${FIELD_LABELS[key]} on card layout`}
+                    onClick={() => toggleFieldOnLayout(key)}
+                  >
+                    {exists ? "On layout" : "Off"}
+                  </button>
+                </div>
               );
             })}
           </div>

@@ -212,9 +212,9 @@
 
 .markerSelected {
   background: #0d9488;
-  transform: scale(1.2);
+  transform: scale(1.35);
   z-index: 3;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.45);
 }
 
 .markerLabel {
@@ -320,15 +320,34 @@
   flex-direction: column;
   gap: 0.35rem;
   padding: 0 0.85rem 0.85rem;
-  max-height: 16rem;
+  max-height: 20rem;
   overflow-y: auto;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  border-radius: 0.75rem;
+  padding: 0.12rem;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.fieldRowActive {
+  background: #ecfdf5;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.35);
+}
+
+.fieldRowOff {
+  opacity: 0.82;
 }
 
 .fieldBtn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border-radius: 0.65rem;
   border: 1px solid #e2e8f0;
   background: #fff;
@@ -361,6 +380,36 @@
 
 .fieldStatusOn {
   color: #059669;
+}
+
+.layoutToggle {
+  flex-shrink: 0;
+  min-width: 4.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0.55rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.layoutToggleOn {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.layoutToggleOff {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.layoutToggle:hover {
+  border-color: #cbd5e1;
 }
 
 .propsPanel {

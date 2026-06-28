@@ -5,6 +5,8 @@ export type TemplateFieldKey =
   | "name"
   | "firstName"
   | "lastName"
+  | "fatherName"
+  | "motherName"
   | "enrollId"
   | "classSection"
   | "dob"
@@ -36,6 +38,8 @@ export const DEFAULT_FIELD_LABELS: Record<TemplateFieldKey, string> = {
   name: "Name",
   firstName: "First Name",
   lastName: "Last Name",
+  fatherName: "Father Name",
+  motherName: "Mother Name",
   enrollId: "Enroll ID",
   classSection: "Class",
   dob: "DOB",
@@ -127,6 +131,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       x: 380,
       y: 235,
       fontSize: 22,
+      bold: true,
       maxWidth: 600,
       showLabel: false,
       labelX: 280,
@@ -136,6 +141,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       x: 380,
       y: 280,
       fontSize: 20,
+      bold: true,
       maxWidth: 600,
       showLabel: false,
       labelX: 280,
@@ -145,6 +151,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       x: 380,
       y: 325,
       fontSize: 20,
+      bold: true,
       maxWidth: 600,
       showLabel: false,
       labelX: 280,
@@ -154,6 +161,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       x: 380,
       y: 370,
       fontSize: 18,
+      bold: true,
       maxWidth: 600,
       showLabel: false,
       labelX: 280,
@@ -163,6 +171,7 @@ export const DEFAULT_TEMPLATE_LAYOUT: TemplateLayout = {
       x: 380,
       y: 410,
       fontSize: 16,
+      bold: true,
       maxWidth: 600,
       lineHeight: 22,
       showLabel: false,
