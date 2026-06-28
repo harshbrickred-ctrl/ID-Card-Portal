@@ -2,6 +2,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { createCanvas, registerFont } from "@napi-rs/canvas/node-canvas";
+import { CARD_VALUE_TEXT_FILL } from "./constants";
 
 /** Resolve DejaVu from package.json anchors — bundled import.meta.url breaks require.resolve on Turbopack. */
 function resolveDejavuFontRoot(): string {
@@ -73,7 +74,7 @@ export async function renderTextOverlay(
     const fontSize = Math.max(8, Math.round(item.fontSize));
     const fontFamily = item.bold ? "CardFontBold" : "CardFont";
     ctx.font = `${fontSize}px "${fontFamily}", sans-serif`;
-    ctx.fillStyle = item.fill ?? "#1a2e4a";
+    ctx.fillStyle = item.fill ?? CARD_VALUE_TEXT_FILL;
     ctx.textAlign = mapTextAlign(item.anchor);
     ctx.textBaseline = item.baseline === "middle" ? "middle" : "alphabetic";
 

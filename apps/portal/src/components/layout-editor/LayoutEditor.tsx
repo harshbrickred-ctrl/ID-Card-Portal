@@ -345,7 +345,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
       labelX: Math.round(sourceWidth * 0.4),
       labelY: y,
       dominantBaseline: "middle",
-      fill: "#1a2e4a",
+      fill: "#0a0a0a",
     };
   }
 

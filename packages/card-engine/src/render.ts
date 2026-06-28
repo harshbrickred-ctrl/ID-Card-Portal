@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
-import { CARD_HEIGHT, CARD_WIDTH } from "./constants";
+import { CARD_HEIGHT, CARD_WIDTH, CARD_VALUE_TEXT_FILL, LEGACY_CARD_VALUE_TEXT_FILL } from "./constants";
 import { resolveCardDimensions, scaleFromCr80, type CardDimensions } from "./dimensions";
 import {
   DEFAULT_TEMPLATE_LAYOUT,
@@ -72,6 +72,11 @@ function fieldValue(
   }
 }
 
+function resolveFieldFill(fill?: string): string {
+  if (!fill || fill.toLowerCase() === LEGACY_CARD_VALUE_TEXT_FILL) return CARD_VALUE_TEXT_FILL;
+  return fill;
+}
+
 function collectFieldTextItems(
   field: TemplateLayout["fields"][number],
   student: RenderStudentCardInput["student"],
@@ -99,7 +104,7 @@ function collectFieldTextItems(
       y: (field.labelY ?? field.y) + middleOffset,
       fontSize: field.labelFontSize ?? field.fontSize,
       bold: true,
-      fill: field.labelFill ?? field.fill ?? "#1a2e4a",
+      fill: field.labelFill ?? resolveFieldFill(field.fill),
       anchor,
       baseline,
     });
@@ -112,7 +117,7 @@ function collectFieldTextItems(
       y: field.y + middleOffset,
       fontSize: field.fontSize,
       bold: field.bold ?? true,
-      fill: field.fill ?? "#1a2e4a",
+      fill: resolveFieldFill(field.fill),
       anchor,
       baseline,
       lineIndex: i,
