@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
     "pdf-to-png-converter",
     "pdfjs-dist",
     "@napi-rs/canvas",
+    "dejavu-fonts-ttf",
   ],
   // Hoisted deps live at monorepo root — include them in serverless traces (pdfjs cmaps/fonts).
   outputFileTracingRoot: monorepoRoot,
@@ -29,6 +30,7 @@ const nextConfig: NextConfig = {
       "../../node_modules/@napi-rs/canvas/**",
       "../../node_modules/@napi-rs/canvas-*/**",
       "../../node_modules/@napi-rs/canvas/geometry.js",
+      "../../node_modules/dejavu-fonts-ttf/**",
     ],
   },
 };

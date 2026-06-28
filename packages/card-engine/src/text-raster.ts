@@ -1,6 +1,12 @@
+import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
+
+function cardFontPath(file: "DejaVuSans.ttf" | "DejaVuSans-Bold.ttf"): string {
+  const pkgRoot = path.dirname(require.resolve("dejavu-fonts-ttf/package.json"));
+  return path.join(pkgRoot, "ttf", file);
+}
 
 export type TextOverlayItem = {
   text: string;
@@ -22,10 +28,8 @@ function ensureCardFonts() {
   const { registerFont } = require("@napi-rs/canvas") as {
     registerFont: (p: string, opts: { family: string; weight?: string }) => void;
   };
-  const sans = require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans.ttf");
-  const sansBold = require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf");
-  registerFont(sans, { family: "CardFont" });
-  registerFont(sansBold, { family: "CardFont", weight: "bold" });
+  registerFont(cardFontPath("DejaVuSans.ttf"), { family: "CardFont" });
+  registerFont(cardFontPath("DejaVuSans-Bold.ttf"), { family: "CardFont", weight: "bold" });
   fontsReady = true;
 }
 
