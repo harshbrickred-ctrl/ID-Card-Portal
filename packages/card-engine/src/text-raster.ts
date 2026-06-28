@@ -1,6 +1,7 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { createCanvas, registerFont } from "@napi-rs/canvas/node-canvas";
 
 /** Resolve DejaVu from package.json anchors — bundled import.meta.url breaks require.resolve on Turbopack. */
 function resolveDejavuFontRoot(): string {
@@ -40,33 +41,9 @@ export type TextOverlayItem = {
 };
 
 let fontsReady = false;
-let canvasRequire: NodeRequire | null = null;
-
-function loadCanvasRequire(): NodeRequire {
-  if (canvasRequire) return canvasRequire;
-  const anchors = [
-    path.join(process.cwd(), "package.json"),
-    path.join(process.cwd(), "../../package.json"),
-  ];
-  for (const anchor of anchors) {
-    try {
-      canvasRequire = createRequire(anchor);
-      canvasRequire.resolve("@napi-rs/canvas");
-      return canvasRequire;
-    } catch {
-      /* try next anchor */
-    }
-  }
-  canvasRequire = createRequire(fileURLToPath(import.meta.url));
-  return canvasRequire;
-}
 
 function ensureCardFonts() {
   if (fontsReady) return;
-  const req = loadCanvasRequire();
-  const { registerFont } = req("@napi-rs/canvas") as {
-    registerFont: (p: string, opts: { family: string; weight?: string }) => void;
-  };
   registerFont(cardFontPath("DejaVuSans.ttf"), { family: "CardFont" });
   registerFont(cardFontPath("DejaVuSans-Bold.ttf"), { family: "CardFont", weight: "bold" });
   fontsReady = true;
@@ -85,19 +62,6 @@ export async function renderTextOverlay(
   items: TextOverlayItem[],
 ): Promise<Buffer> {
   ensureCardFonts();
-  const { createCanvas } = loadCanvasRequire()("@napi-rs/canvas") as {
-    createCanvas: (w: number, h: number) => {
-      getContext: (type: "2d") => {
-        clearRect: (x: number, y: number, w: number, h: number) => void;
-        font: string;
-        fillStyle: string;
-        textAlign: string;
-        textBaseline: string;
-        fillText: (text: string, x: number, y: number) => void;
-      };
-      toBuffer: (mime: "image/png") => Buffer;
-    };
-  };
 
   const canvas = createCanvas(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
   const ctx = canvas.getContext("2d");
