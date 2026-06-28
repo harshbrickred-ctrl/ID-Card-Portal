@@ -13,8 +13,10 @@
     "test": "tsx --test src/**/*.test.mjs"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.0",
     "@idportal/contracts": "*",
     "archiver": "^7.0.1",
+    "dejavu-fonts-ttf": "^2.37.3",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.5"

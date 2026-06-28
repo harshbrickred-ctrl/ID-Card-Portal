@@ -11,6 +11,7 @@ import {
   type TemplatePhotoShape,
 } from "./layout";
 import type { RenderStudentCardInput } from "./types";
+import { renderTextOverlay, type TextOverlayItem } from "./text-raster";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -50,53 +51,28 @@ function fieldValue(
       const parts = student.lastName?.trim()
         ? [student.lastName.trim()]
         : student.name.trim().split(/\s+/).slice(1);
-      return parts.join(" ") || "—";
+      return parts.join(" ") || "-";
     }
     case "enrollId":
       return student.enrollId;
     case "classSection":
       return `${student.class} - ${student.section}`;
     case "dob":
-      return student.dob?.trim() || "—";
+      return student.dob?.trim() || "-";
     case "phone":
-      return student.phoneNumber?.trim() || "—";
+      return student.phoneNumber?.trim() || "-";
     case "address":
-      return student.address?.trim() || "—";
+      return student.address?.trim() || "-";
     case "academicYear":
-      return school.academicYear?.trim() || "—";
+      return school.academicYear?.trim() || "-";
   }
 }
 
-function textEl(
-  x: number,
-  y: number,
-  text: string,
-  opts: {
-    fontSize: number;
-    bold?: boolean;
-    fill?: string;
-    anchor?: string;
-    baseline?: string;
-    middleOffset?: number;
-    lineIndex?: number;
-    lineHeight?: number;
-  },
-): string {
-  const weight = opts.bold ? "700" : "400";
-  const fill = opts.fill ?? "#0f172a";
-  const anchor = opts.anchor ?? "start";
-  const baseline = opts.baseline ?? "auto";
-  const lineHeight = opts.lineHeight ?? Math.round(opts.fontSize * 1.35);
-  const lineIndex = opts.lineIndex ?? 0;
-  const yPos = y + (opts.middleOffset ?? 0) + lineIndex * lineHeight;
-  return `<text x="${x}" y="${yPos}" font-family="Arial, Helvetica, sans-serif" font-size="${opts.fontSize}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}" dominant-baseline="${baseline === "middle" ? "middle" : "auto"}">${esc(text)}</text>`;
-}
-
-function renderFieldSvg(
+function collectFieldTextItems(
   field: TemplateLayout["fields"][number],
   student: RenderStudentCardInput["student"],
   school: RenderStudentCardInput["school"],
-): string {
+): TextOverlayItem[] {
   const labeled = Boolean(field.showLabel);
   const value = fieldValue(field.key, student, school, { labeled });
   const maxChars = field.maxWidth ? Math.floor(field.maxWidth / (field.fontSize * 0.55)) : 60;
@@ -109,41 +85,38 @@ function renderFieldSvg(
       ? -Math.round(((lines.length - 1) * lineHeight) / 2)
       : 0;
 
-  const parts: string[] = [];
+  const items: TextOverlayItem[] = [];
 
   if (labeled) {
     const labelText = `${field.label ?? DEFAULT_FIELD_LABELS[field.key]} :`;
-    const labelX = field.labelX ?? field.x;
-    const labelY = field.labelY ?? field.y;
-    const labelSize = field.labelFontSize ?? field.fontSize;
-    parts.push(
-      textEl(labelX, labelY, labelText, {
-        fontSize: labelSize,
-        bold: true,
-        fill: field.labelFill ?? field.fill ?? "#334155",
-        anchor,
-        baseline,
-        middleOffset,
-      }),
-    );
+    items.push({
+      text: labelText,
+      x: field.labelX ?? field.x,
+      y: (field.labelY ?? field.y) + middleOffset,
+      fontSize: field.labelFontSize ?? field.fontSize,
+      bold: true,
+      fill: field.labelFill ?? field.fill ?? "#1a2e4a",
+      anchor,
+      baseline,
+    });
   }
 
   for (const [i, line] of lines.entries()) {
-    parts.push(
-      textEl(field.x, field.y, line, {
-        fontSize: field.fontSize,
-        bold: field.bold,
-        fill: field.fill,
-        anchor,
-        baseline,
-        middleOffset,
-        lineIndex: i,
-        lineHeight,
-      }),
-    );
+    items.push({
+      text: line,
+      x: field.x,
+      y: field.y + middleOffset,
+      fontSize: field.fontSize,
+      bold: field.bold,
+      fill: field.fill ?? "#1a2e4a",
+      anchor,
+      baseline,
+      lineIndex: i,
+      lineHeight,
+    });
   }
 
-  return parts.join("");
+  return items;
 }
 
 async function photoRect(
@@ -283,11 +256,15 @@ export async function renderStudentCard(input: RenderStudentCardInput): Promise<
     renderLayout.signature.height,
   );
 
-  const textSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">
-  ${renderLayout.fields.map((field) => renderFieldSvg(field, student, school)).join("")}
-  ${photoFrameSvg(renderLayout, accent)}
-</svg>`;
+  const textItems = renderLayout.fields.flatMap((field) =>
+    collectFieldTextItems(field, student, school),
+  );
+  const textLayer = await renderTextOverlay(canvasW, canvasH, textItems);
+
+  const frameSvg =
+    photoFrameSvg(renderLayout, accent).length > 0
+      ? `<?xml version="1.0" encoding="UTF-8"?><svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">${photoFrameSvg(renderLayout, accent)}</svg>`
+      : null;
 
   const composites: sharp.OverlayOptions[] = [];
   if (photo) {
@@ -300,7 +277,10 @@ export async function renderStudentCard(input: RenderStudentCardInput): Promise<
       left: renderLayout.signature.x,
     });
   }
-  composites.push({ input: Buffer.from(textSvg), top: 0, left: 0 });
+  composites.push({ input: textLayer, top: 0, left: 0 });
+  if (frameSvg) {
+    composites.push({ input: Buffer.from(frameSvg), top: 0, left: 0 });
+  }
 
   return sharp(base).composite(composites).png().toBuffer();
 }
@@ -326,29 +306,73 @@ export async function renderStudentCardBack(
   });
 
   const addressMaxChars = Math.max(20, Math.floor(55 * sx));
-  const addressLines = student.address?.trim()
-    ? wrapText(student.address, addressMaxChars)
-        .map(
-          (line, i) =>
-            `<text x="${padX}" y="${Math.round(220 * sy) + i * Math.round(22 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(16 * fontScale)}" fill="#94a3b8">${esc(line)}</text>`,
-        )
-        .join("")
-    : "";
+  const addressLines = student.address?.trim() ? wrapText(student.address, addressMaxChars) : [];
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  const backTextItems: TextOverlayItem[] = [
+    {
+      text: school.name,
+      x: padX,
+      y: Math.round(80 * sy),
+      fontSize: Math.round(28 * fontScale),
+      bold: true,
+      fill: "#0f172a",
+    },
+    {
+      text: student.name,
+      x: padX,
+      y: Math.round(130 * sy),
+      fontSize: Math.round(20 * fontScale),
+      fill: "#64748b",
+    },
+    {
+      text: `Enroll: ${student.enrollId}`,
+      x: padX,
+      y: Math.round(170 * sy),
+      fontSize: Math.round(18 * fontScale),
+      fill: "#64748b",
+    },
+  ];
+  if (student.phoneNumber?.trim()) {
+    backTextItems.push({
+      text: `Phone: ${student.phoneNumber.trim()}`,
+      x: padX,
+      y: Math.round(200 * sy),
+      fontSize: Math.round(16 * fontScale),
+      fill: "#94a3b8",
+    });
+  }
+  for (const [i, line] of addressLines.entries()) {
+    backTextItems.push({
+      text: line,
+      x: padX,
+      y: Math.round(220 * sy),
+      fontSize: Math.round(16 * fontScale),
+      fill: "#94a3b8",
+      lineIndex: i,
+      lineHeight: Math.round(22 * sy),
+    });
+  }
+  backTextItems.push({
+    text: `If found, please return to ${school.name}`,
+    x: padX,
+    y: height - Math.round(48 * sy),
+    fontSize: Math.round(14 * fontScale),
+    fill: "#94a3b8",
+  });
+
+  const accentSvg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <rect width="100%" height="100%" fill="#ffffff"/>
   <rect x="0" y="0" width="100%" height="${accentH}" fill="${accent}"/>
-  <text x="${padX}" y="${Math.round(80 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(28 * fontScale)}" font-weight="700" fill="#0f172a">${esc(school.name)}</text>
-  <text x="${padX}" y="${Math.round(130 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(20 * fontScale)}" fill="#64748b">${esc(student.name)}</text>
-  <text x="${padX}" y="${Math.round(170 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(18 * fontScale)}" fill="#64748b">Enroll: ${esc(student.enrollId)}</text>
-  ${student.phoneNumber ? `<text x="${padX}" y="${Math.round(200 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(16 * fontScale)}" fill="#94a3b8">Phone: ${esc(student.phoneNumber)}</text>` : ""}
-  ${addressLines}
-  <text x="${padX}" y="${height - Math.round(48 * sy)}" font-family="Arial, Helvetica, sans-serif" font-size="${Math.round(14 * fontScale)}" fill="#94a3b8">If found, please return to ${esc(school.name)}</text>
 </svg>`;
 
-  return sharp(Buffer.from(svg))
-    .composite([{ input: qrPng, top: Math.round(240 * sy), left: width - Math.round(230 * sx) }])
+  const textLayer = await renderTextOverlay(width, height, backTextItems);
+
+  return sharp(Buffer.from(accentSvg))
+    .composite([
+      { input: textLayer, top: 0, left: 0 },
+      { input: qrPng, top: Math.round(240 * sy), left: width - Math.round(230 * sx) },
+    ])
     .png()
     .toBuffer();
 }

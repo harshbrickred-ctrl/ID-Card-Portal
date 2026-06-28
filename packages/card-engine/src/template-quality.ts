@@ -219,6 +219,15 @@ export async function assessTemplateHealth(imageBuffer: Buffer): Promise<Templat
   const overall = overallHealthScore(scores);
   const { warnings, tips } = buildWarnings(scores, flags);
 
+  const aspect = width / height;
+  if (width > 0 && height > 0 && Math.abs(aspect - CR80_ASPECT) / CR80_ASPECT > 0.12) {
+    warnings.push("Template aspect ratio doesn't match CR-80 ID card — crop to the card face only");
+    tips.unshift("Upload only the card artwork (landscape 1011×638 px), not a full page screenshot.");
+  }
+  if (density != null && density > 0 && density < 150 && !matchesCr80) {
+    warnings.push("PNG was exported at screen resolution (~72 DPI) — re-export at 300 DPI");
+  }
+
   return {
     overall,
     scores,
