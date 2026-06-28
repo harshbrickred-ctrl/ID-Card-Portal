@@ -122,7 +122,6 @@ export default function PrintPage() {
 
   const [modalCard, setModalCard] = useState<PreviewItem | null>(null);
   const [modalSide, setModalSide] = useState<"front" | "back">("front");
-  const [printFormat, setPrintFormat] = useState<"zip" | "pdf">("pdf");
 
   const [step, setStep] = useState<"select" | "preview">("select");
 
@@ -455,7 +454,7 @@ export default function PrintPage() {
 
       await apiPostDownload(
         "/v1/print/execute",
-        { schoolId, studentIds, format: printFormat },
+        { schoolId, studentIds, format: "zip" },
         `id-cards-${selectedSchool?.code ?? "school"}`,
       );
 
@@ -533,7 +532,7 @@ export default function PrintPage() {
 
             <p className={dash.headerDesc}>
 
-              Select students, preview cards against the school template, then download a print-ready ZIP
+              Select students, preview cards against the school template, then download PNG images (ZIP)
 
             </p>
 
@@ -966,18 +965,6 @@ export default function PrintPage() {
               </div>
 
               <div className={styles.actionRow}>
-                <label className={styles.formatSelect}>
-                  <span className="sr-only">Download format</span>
-                  <select
-                    value={printFormat}
-                    onChange={(e) => setPrintFormat(e.target.value as "zip" | "pdf")}
-                    className={styles.formSelect}
-                    disabled={printing}
-                  >
-                    <option value="pdf">PDF print sheet (A4)</option>
-                    <option value="zip">ZIP (PNG files)</option>
-                  </select>
-                </label>
                 <button
                   type="button"
                   disabled={!preview.canPrint || printing}
@@ -985,7 +972,7 @@ export default function PrintPage() {
                   className={dash.primaryBtn}
                 >
                   <Printer className="h-4 w-4" />
-                  {printing ? "Preparing download…" : `Download ${preview.previews.length} cards`}
+                  {printing ? "Preparing download…" : `Download ${preview.previews.length} PNG images`}
                   <Download className="h-4 w-4" />
                 </button>
               </div>

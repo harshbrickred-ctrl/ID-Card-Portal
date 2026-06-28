@@ -1,11 +1,29 @@
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
-const require = createRequire(import.meta.url);
+/** Resolve DejaVu from package.json anchors — bundled import.meta.url breaks require.resolve on Turbopack. */
+function resolveDejavuFontRoot(): string {
+  const anchors = [
+    path.join(process.cwd(), "package.json"),
+    path.join(process.cwd(), "../../package.json"),
+    fileURLToPath(import.meta.url),
+  ];
+
+  for (const anchor of anchors) {
+    try {
+      const req = createRequire(anchor);
+      return path.dirname(req.resolve("dejavu-fonts-ttf/package.json"));
+    } catch {
+      /* try next anchor */
+    }
+  }
+
+  throw new Error("dejavu-fonts-ttf not found — run npm install at the monorepo root");
+}
 
 function cardFontPath(file: "DejaVuSans.ttf" | "DejaVuSans-Bold.ttf"): string {
-  const pkgRoot = path.dirname(require.resolve("dejavu-fonts-ttf/package.json"));
-  return path.join(pkgRoot, "ttf", file);
+  return path.join(resolveDejavuFontRoot(), "ttf", file);
 }
 
 export type TextOverlayItem = {
@@ -22,10 +40,31 @@ export type TextOverlayItem = {
 };
 
 let fontsReady = false;
+let canvasRequire: NodeRequire | null = null;
+
+function loadCanvasRequire(): NodeRequire {
+  if (canvasRequire) return canvasRequire;
+  const anchors = [
+    path.join(process.cwd(), "package.json"),
+    path.join(process.cwd(), "../../package.json"),
+  ];
+  for (const anchor of anchors) {
+    try {
+      canvasRequire = createRequire(anchor);
+      canvasRequire.resolve("@napi-rs/canvas");
+      return canvasRequire;
+    } catch {
+      /* try next anchor */
+    }
+  }
+  canvasRequire = createRequire(fileURLToPath(import.meta.url));
+  return canvasRequire;
+}
 
 function ensureCardFonts() {
   if (fontsReady) return;
-  const { registerFont } = require("@napi-rs/canvas") as {
+  const req = loadCanvasRequire();
+  const { registerFont } = req("@napi-rs/canvas") as {
     registerFont: (p: string, opts: { family: string; weight?: string }) => void;
   };
   registerFont(cardFontPath("DejaVuSans.ttf"), { family: "CardFont" });
@@ -46,7 +85,7 @@ export async function renderTextOverlay(
   items: TextOverlayItem[],
 ): Promise<Buffer> {
   ensureCardFonts();
-  const { createCanvas } = require("@napi-rs/canvas") as {
+  const { createCanvas } = loadCanvasRequire()("@napi-rs/canvas") as {
     createCanvas: (w: number, h: number) => {
       getContext: (type: "2d") => {
         clearRect: (x: number, y: number, w: number, h: number) => void;

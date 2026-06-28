@@ -24,18 +24,6 @@ const EDITOR_FIELDS: TemplateFieldKeyDto[] = [
 
 const FIELD_LABELS = DEFAULT_FIELD_LABELS;
 
-const SAMPLE_VALUES: Record<TemplateFieldKeyDto, string> = {
-  name: "Sample Name",
-  firstName: "Sample",
-  lastName: "Name",
-  enrollId: "ENR-2026-001",
-  classSection: "10 - A",
-  dob: "2010-05-12",
-  phone: "9876543210",
-  address: "12 MG Road, Mumbai",
-  academicYear: "2026-2027",
-};
-
 type ResizeCorner = "se";
 
 type Selection = "photo" | "signature" | TemplateFieldKeyDto | "label";
@@ -74,13 +62,6 @@ function photoRegionRadius(shape: TemplateLayoutDto["photoShape"], scale: number
   if (shape === "circle") return "50%";
   if (shape === "ellipse") return "50% / 50%";
   return `${Math.round(6 * scale)}px`;
-}
-
-function sampleFieldText(field: TemplateLayoutDto["fields"][number]) {
-  if (field.showLabel) {
-    return `${field.label ?? FIELD_LABELS[field.key]} : ${SAMPLE_VALUES[field.key]}`;
-  }
-  return SAMPLE_VALUES[field.key];
 }
 
 function defaultLabelPosition(field: TemplateLayoutDto["fields"][number], sourceWidth: number) {
@@ -494,7 +475,6 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                 const showLabelMarker = Boolean(field.showLabel);
                 const labelX = field.labelX ?? defaultLabelPosition(field, sourceWidth).labelX;
                 const labelY = field.labelY ?? field.y;
-                const previewSize = Math.max(10, Math.round(field.fontSize * scale));
                 return (
                   <div key={field.key}>
                     {showLabelMarker ? (
@@ -508,21 +488,9 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
                       </div>
                     ) : null}
                     <div
-                      className={`${styles.fieldPreview} ${isSelected ? styles.fieldPreviewSelected : ""}`}
-                      style={{
-                        left: field.x * scale,
-                        top: field.y * scale,
-                        fontSize: previewSize,
-                        color: field.fill ?? "#0f172a",
-                        maxWidth: field.maxWidth ? field.maxWidth * scale : undefined,
-                      }}
-                    >
-                      {sampleFieldText(field)}
-                    </div>
-                    <div
                       className={`${styles.marker} ${isSelected ? styles.markerSelected : ""}`}
                       style={{ left: field.x * scale, top: field.y * scale }}
-                      title={`${FIELD_LABELS[field.key]} value — drag to move`}
+                      title={`${FIELD_LABELS[field.key]} — drag to move`}
                       onPointerDown={(e) => startDrag(e, field.key, field.x, field.y, field.key)}
                     />
                   </div>
@@ -549,7 +517,7 @@ export function LayoutEditor({ template }: { template: LayoutEditorTemplate }) {
           </div>
 
           <p className={styles.hint}>
-            Drag sample text into place. Turn <strong>Show label</strong> off when your template artwork already
+            Drag the red dots into place. Turn <strong>Show label</strong> off when your template artwork already
             prints labels like &quot;Enroll No :&quot;.
           </p>
 
